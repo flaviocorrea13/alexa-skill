@@ -1,0 +1,73 @@
+network:
+  5000/tcp: Alexa skill HTTP port. Expose it only through an HTTPS tunnel.
+
+configuration:
+  SKILL_HOSTNAME:
+    name: Public skill hostname
+    description: >-
+      Public hostname, without https://, that Alexa will use to call the
+      skill. Example: skill.example.com. The tunnel must forward this host to
+      port 5000 of this add-on.
+  MA_HOSTNAME:
+    name: Public Music Assistant stream hostname
+    description: >-
+      Public hostname, without https://, used for Music Assistant audio
+      streams. Example: ma.example.com. The tunnel must forward this host to
+      the Music Assistant stream port, usually 8097. Leave it empty only if
+      you use display-capable (APL) devices exclusively.
+  APP_USERNAME:
+    name: Dashboard username
+    description: >-
+      Basic authentication username for /setup and /status. Leave it empty to
+      generate a random username in /data automatically.
+  APP_PASSWORD:
+    name: Dashboard password
+    description: >-
+      Basic authentication password for /setup and /status. Leave it empty to
+      generate a random password in /data automatically. The password is never
+      written to the logs.
+  PORT:
+    name: HTTP port
+    description: >-
+      Internal add-on port. Keep it at 5000; the port mapping and the watchdog
+      use this port.
+  LOCALE:
+    name: Skill locale
+    description: >-
+      Locale used when creating the skill and uploading interaction models.
+  TZ:
+    name: Time zone
+    description: >-
+      Container time zone. Example: America/Sao_Paulo.
+  AWS_DEFAULT_REGION:
+    name: AWS region
+    description: >-
+      Region used by the ASK CLI. The default is us-east-1.
+  ENABLE_APL:
+    name: Enable APL
+    description: >-
+      Enable Alexa Presentation Language responses on display-capable devices
+      such as Echo Show.
+  SKIP_URL_VALIDATION:
+    name: Skip audio URL validation
+    description: >-
+      Do not check the stream URL before sending it to Alexa. Useful when the
+      add-on cannot reach the public Music Assistant hostname.
+  SKILL_ID:
+    name: Skill ID (advanced)
+    description: >-
+      Existing amzn1.ask.skill... ID. After setup, enter the ID shown in the
+      logs so the skill accepts only its own requests. Leave it empty to
+      accept any skill signed by Amazon.
+  MA_API_URL:
+    name: Music Assistant API URL (advanced)
+    description: >-
+      Base URL of the Music Assistant WebSocket API on port 8095. Example:
+      http://192.168.1.10:8095. This is different from the stream port 8097.
+      Required for voice commands such as next, previous, and start over.
+  MA_API_TOKEN:
+    name: Music Assistant API token (advanced)
+    description: >-
+      Music Assistant API access token. Leave it empty if the API does not
+      require authentication. The token is stored in a mode-600 file and is
+      never written to the logs.

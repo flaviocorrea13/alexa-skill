@@ -1,0 +1,73 @@
+network:
+  5000/tcp: Porta HTTP da skill Alexa. Publique apenas através de um túnel HTTPS.
+
+configuration:
+  SKILL_HOSTNAME:
+    name: Hostname público da skill
+    description: >-
+      Nome de host público, sem https://, que a Alexa usará para chamar a
+      skill. Exemplo: skill.exemplo.com. O túnel deve encaminhar esse host
+      para a porta 5000 deste add-on.
+  MA_HOSTNAME:
+    name: Hostname público do stream do Music Assistant
+    description: >-
+      Nome de host público, sem https://, usado nos streams de áudio do Music
+      Assistant. Exemplo: ma.exemplo.com. O túnel deve encaminhar esse host
+      para a porta de stream do Music Assistant, normalmente 8097. Deixe em
+      branco apenas se você usa somente dispositivos com tela (APL).
+  APP_USERNAME:
+    name: Usuário do painel
+    description: >-
+      Usuário da autenticação básica de /setup e /status. Deixe em branco para
+      gerar automaticamente um usuário aleatório em /data.
+  APP_PASSWORD:
+    name: Senha do painel
+    description: >-
+      Senha da autenticação básica de /setup e /status. Deixe em branco para
+      gerar automaticamente uma senha aleatória em /data. A senha nunca é
+      exibida nos logs.
+  PORT:
+    name: Porta HTTP
+    description: >-
+      Porta interna do add-on. Mantenha 5000; o mapeamento de portas e o
+      watchdog usam essa porta.
+  LOCALE:
+    name: Idioma da skill
+    description: >-
+      Idioma usado ao criar a skill e enviar os modelos de interação.
+  TZ:
+    name: Fuso horário
+    description: >-
+      Fuso horário do contêiner. Exemplo: America/Sao_Paulo.
+  AWS_DEFAULT_REGION:
+    name: Região da AWS
+    description: >-
+      Região usada pelo ASK CLI. O padrão é us-east-1.
+  ENABLE_APL:
+    name: Habilitar APL
+    description: >-
+      Habilita respostas com Alexa Presentation Language em dispositivos com
+      tela, como Echo Show.
+  SKIP_URL_VALIDATION:
+    name: Pular validação da URL de áudio
+    description: >-
+      Não verifica a URL do stream antes de enviá-la à Alexa. Útil quando o
+      add-on não consegue alcançar o hostname público do Music Assistant.
+  SKILL_ID:
+    name: ID da skill (avançado)
+    description: >-
+      ID amzn1.ask.skill... de uma skill existente. Depois do setup, informe o
+      ID exibido nos logs para que a skill aceite apenas as requisições dela.
+      Deixe em branco para aceitar qualquer skill assinada pela Amazon.
+  MA_API_URL:
+    name: URL da API do Music Assistant (avançado)
+    description: >-
+      URL base da API WebSocket do Music Assistant, na porta 8095. Exemplo:
+      http://192.168.1.10:8095. É diferente da porta de stream 8097. Necessária
+      para comandos de voz como próxima, anterior e início da faixa.
+  MA_API_TOKEN:
+    name: Token da API do Music Assistant (avançado)
+    description: >-
+      Token de acesso da API do Music Assistant. Deixe em branco se a API não
+      exigir autenticação. O token é gravado em arquivo com permissão 600 e
+      não aparece nos logs.
