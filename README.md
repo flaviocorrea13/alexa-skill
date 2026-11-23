@@ -64,7 +64,7 @@ Decisões registradas para as próximas fases:
 3. Adicione:
 
    ```text
-   https://github.com/flaviocorrea13/alexa-ma-skill
+   https://github.com/flaviocorrea13/alexa-skill
    ```
 
 4. Instale o add-on **Alexa MA Skill**.
@@ -170,7 +170,7 @@ assisted setup flow (Phase 3) are planned.
 
 Quick start:
 
-1. Add `https://github.com/flaviocorrea13/alexa-ma-skill` as an add-on
+1. Add `https://github.com/flaviocorrea13/alexa-skill` as an add-on
    repository.
 2. Install **Alexa MA Skill**.
 3. Set `SKILL_HOSTNAME`, `MA_HOSTNAME`, `LOCALE`, and `TZ`.

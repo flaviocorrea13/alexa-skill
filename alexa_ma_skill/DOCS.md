@@ -72,7 +72,7 @@ https://MA_HOSTNAME  --->  túnel/reverse proxy  --->  Music Assistant :8097
 
 1. No Home Assistant, abra **Configurações > Add-ons > Loja de add-ons**.
 2. No menu de três pontos, escolha **Repositórios**.
-3. Adicione `https://github.com/flaviocorrea13/alexa-ma-skill`.
+3. Adicione `https://github.com/flaviocorrea13/alexa-skill`.
 4. Instale o add-on **Alexa MA Skill**.
 5. Abra a aba **Configuração** e preencha as opções. `SKILL_HOSTNAME` é
    obrigatório. `MA_HOSTNAME` é obrigatório para dispositivos sem tela
@@ -278,10 +278,11 @@ O mesmo princípio se aplica:
     - `pt-BR`: **"Alexa, abra minha rádio"**
     - `en-US`: **"Alexa, open my radio"**
 
-> **Nome da skill:** o projeto upstream usa o nome de exibição **"My Radio"**
-> (e variantes por idioma) e a frase de invocação **"minha rádio"** em
-> `pt-BR`. O nome não é "Alexa MA Skill". Consulte o console da Amazon para
-> confirmar o nome e a frase de invocação da skill criada.
+> **Nome da skill:** o manifesto construído pelo upstream define o nome de
+> exibição **"Music Assistant"**. A frase de invocação vem do modelo de
+> interação (por exemplo, **"minha rádio"** em `pt-BR` e **"my radio"** em
+> `en-US`). O nome não é "Alexa MA Skill". Consulte o console da Amazon para
+> confirmar.
 
 ### Aviso sobre skills existentes
 
@@ -294,9 +295,9 @@ O script upstream procura skills existentes com o nome exato
 Ele não apaga outras skills. Ainda assim, revise o console da Amazon antes de
 executar o setup em uma conta que já tenha skills.
 
-O script cria uma skill chamada "My Radio"/"Minha Rádio". Executar o setup
-novamente pode criar uma skill duplicada em vez de atualizar a anterior. Se
-isso acontecer, remova a skill antiga manualmente no console da Amazon.
+O script cria ou reutiliza uma skill chamada "Music Assistant". O nome de
+exibição no console é "Music Assistant"; a frase de invocação vem do modelo de
+interação.
 
 ### Tipo de certificado no manifesto
 
@@ -419,16 +420,14 @@ Não faça chamadas públicas a `/status`.
 - O `/status` mostra o endpoint registrado na skill.
 - Se você mudou `SKILL_HOSTNAME`, execute o setup novamente ou ajuste o
   endpoint no console da Amazon.
-- Evite executar o setup várias vezes sem remover skills antigas; isso pode
-  criar duplicatas.
 
-### Skills duplicadas
+### Skills existentes "Music Assistant"
 
-- O script upstream pode criar uma nova skill "My Radio"/"Minha Rádio" a cada
-  execução.
-- Remova as skills antigas no console da Amazon.
-- Ele também pode apagar skills extras chamadas exatamente "Music Assistant"
-  quando encontra mais de uma. Revise a conta antes de rodar o setup.
+- O script procura skills chamadas exatamente "Music Assistant".
+- Se houver uma, reutiliza; se houver mais de uma, apaga as extras e mantém a
+  primeira.
+- O nome de exibição criado é "Music Assistant"; a frase de invocação vem do
+  modelo de interação.
 
 ## Segurança
 
@@ -464,9 +463,11 @@ Trate o backup como material sensível.
 - O add-on usa uma imagem upstream fixada por versão e digest no `FROM` do
   `Dockerfile`. Atualizações exigem alterar essa linha e a versão do add-on.
 - O login da Amazon no setup é manual; não há autenticação totalmente headless.
-- O script upstream pode apagar skills extras chamadas "Music Assistant" e
-  pode criar skills duplicadas "My Radio" em execuções repetidas.
-- O nome de exibição e a frase de invocação vêm do upstream.
+- O script upstream pode apagar skills extras chamadas "Music Assistant"
+  quando há mais de uma. O nome de exibição criado é "Music Assistant" e a
+  frase de invocação vem do modelo de interação.
+- `fr-CA` e `nl-NL` têm frase de invocação vazia no upstream; a criação da
+  skill pode falhar nesses locales.
 - O manifesto gerado usa `sslCertificateType: Wildcard`; ajuste para `Trusted`
   no console se necessário.
 - `MA_HOSTNAME` remove a porta da URL do stream; o túnel precisa mapear o
@@ -479,7 +480,7 @@ Trate o backup como material sensível.
 ## English quick start
 
 1. Add this repository to the Home Assistant add-on store:
-   `https://github.com/flaviocorrea13/alexa-ma-skill`.
+   `https://github.com/flaviocorrea13/alexa-skill`.
 2. Install **Alexa MA Skill**.
 3. Set `SKILL_HOSTNAME` (for example `skill.example.com`),
    `MA_HOSTNAME` (for example `ma.example.com`), `LOCALE` (for example

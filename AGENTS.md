@@ -254,10 +254,11 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 - Ele procura skills existentes com o nome exato **"Music Assistant"**:
   - se houver uma, reutiliza;
   - se houver mais de uma, apaga as extras e mantém a primeira.
-- A skill criada usa o nome de exibição **"My Radio"** / **"Minha Rádio"** e a
-  frase de invocação **"my radio"** / **"minha rádio"** em `pt-BR`.
-- Execuções repetidas do setup podem criar skills duplicadas "My Radio"; o
-  console da Amazon deve ser revisado.
+- O manifesto construído pelo upstream sobrescreve o nome de exibição para
+  **"Music Assistant"**. A frase de invocação vem do modelo de interação
+  (por exemplo, **"minha rádio"** em `pt-BR` e **"my radio"** em `en-US`).
+- `fr-CA` e `nl-NL` têm frase de invocação vazia no upstream; a criação da
+  skill pode falhar nesses locales.
 - O manifesto gerado usa `sslCertificateType: Wildcard`. Se a Amazon recusar o
   endpoint, ajustar para **Trusted** no console.
 - Ao final, copiar o `Done. Skill ID: amzn1.ask.skill...` para `SKILL_ID` e
@@ -285,7 +286,6 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 - Assistir o `/setup` com login manual na Amazon.
 - **Avisar explicitamente que o script upstream apaga skills extras chamadas
   "Music Assistant"** e pedir confirmação antes de continuar.
-- Considerar o risco de skills duplicadas "My Radio".
 
 ## 8. Regras de implementação
 
