@@ -762,7 +762,16 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
         entry = self.config_entry
         config = entry_config(entry)
         managed = bool(config.get(CONF_MANAGED, False))
-        schema = self._options_schema(config, managed, user_input)
+        suggested_skill_id = ""
+        runtime = self.hass.data.get(DOMAIN, {}).get(entry.entry_id)
+        if runtime is not None and runtime.coordinator.data is not None:
+            suggested_skill_id = runtime.coordinator.data.suggested_skill_id or ""
+        schema = self._options_schema(
+            config,
+            managed,
+            user_input,
+            suggested_skill_id=suggested_skill_id,
+        )
         if user_input is None:
             return self.async_show_form(step_id="init", data_schema=schema)
 
@@ -932,6 +941,8 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
         config: Mapping[str, Any],
         managed: bool,
         defaults: Mapping[str, Any] | None = None,
+        *,
+        suggested_skill_id: str = "",
     ) -> vol.Schema:
         """Return the options schema."""
         defaults = defaults or {}
@@ -987,7 +998,10 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
             ): BooleanSelector(),
             vol.Optional(
                 CONF_SKILL_ID,
-                default=defaults.get(CONF_SKILL_ID, config.get(CONF_SKILL_ID, "")),
+                default=defaults.get(
+                    CONF_SKILL_ID,
+                    config.get(CONF_SKILL_ID) or suggested_skill_id,
+                ),
             ): TextSelector(),
             vol.Optional(
                 CONF_MA_API_URL,

@@ -10,6 +10,8 @@ from .const import (
     CONF_SKILL_HOSTNAME,
     CONF_SKILL_ID,
     DEFAULT_LOCALE,
+    INVOCATION_NAME,
+    INVOCATION_SOURCE,
 )
 from .coordinator import AlexaMaSkillData
 from .util import html_to_text
@@ -18,21 +20,6 @@ SKILL_NAME = "Music Assistant"
 AMAZON_CONSOLE_URL = "https://developer.amazon.com/alexa/console/ask"
 SSL_CERTIFICATE_TYPE = "Wildcard"
 
-INVOCATION_NAMES: dict[str, tuple[str, str | None]] = {
-    "pt-BR": ("minha rádio", "Alexa, abra minha rádio"),
-    "en-US": ("my radio", "Alexa, open my radio"),
-    "en-GB": ("my radio", "Alexa, open my radio"),
-    "en-AU": ("my radio", "Alexa, open my radio"),
-    "en-CA": ("my radio", "Alexa, open my radio"),
-    "en-IN": ("my radio", "Alexa, open my radio"),
-    "de-DE": ("mein radio", "Alexa, öffne mein radio"),
-    "es-ES": ("mi radio", "Alexa, abre mi radio"),
-    "es-MX": ("mi radio", "Alexa, abre mi radio"),
-    "fr-FR": ("ma radio", "Alexa, ouvre ma radio"),
-    "fr-CA": ("", None),
-    "it-IT": ("la mia radio", "Alexa, apri la mia radio"),
-    "nl-NL": ("", None),
-}
 
 _TEXTS: dict[str, dict[str, Any]] = {
     "pt": {
@@ -53,10 +40,15 @@ _TEXTS: dict[str, dict[str, Any]] = {
             "Ajuste o endpoint no console da Amazon ou execute o setup novamente."
         ),
         "action_testing": ("Habilite testing no console da Amazon (Development)."),
-        "action_skill_id": ("Copie o Skill ID para as opções da integração/add-on."),
-        "action_invocation": (
-            "O locale selecionado não tem frase de invocação no upstream; "
-            "use outro locale ou ajuste o modelo."
+        "action_skill_id": (
+            "Copie o Skill ID para as opções da integração/add-on e reinicie."
+        ),
+        "action_skill_id_suggested": (
+            "Defina SKILL_ID como {skill_id} nas opções e reinicie o add-on."
+        ),
+        "action_skill_id_mismatch": (
+            "O SKILL_ID configurado não corresponde à skill detectada. "
+            "Atualize para {skill_id} e reinicie o add-on."
         ),
         "action_stream": ("Verifique o DNS, o túnel e o certificado de MA_HOSTNAME."),
         "warning_manual_login": "O login na Amazon é sempre manual.",
@@ -65,8 +57,8 @@ _TEXTS: dict[str, dict[str, Any]] = {
             "Se houver mais de uma, apaga as extras e mantém a primeira."
         ),
         "warning_display_name": (
-            "O nome de exibição criado pelo manifesto é 'Music Assistant'; "
-            "a frase de invocação vem do modelo de interação."
+            "O nome de exibição criado pelo manifesto é 'Music Assistant' e o "
+            "invocation é 'music assistant' em todos os locales."
         ),
         "warning_public_exposure": (
             "Exponha apenas POST /; mantenha /setup e /status na rede local."
@@ -78,9 +70,17 @@ _TEXTS: dict[str, dict[str, Any]] = {
             "O manifesto usa sslCertificateType: Wildcard; ajuste para Trusted "
             "se a Amazon recusar o endpoint."
         ),
-        "warning_locale_invocation": (
-            "Este locale não define frase de invocação no upstream; "
-            "a criação da skill pode falhar."
+        "warning_skill_id_empty": (
+            "SKILL_ID está vazio; a skill aceita qualquer skill assinada pela "
+            "Amazon. Defina o ID detectado."
+        ),
+        "warning_skill_id_mismatch": (
+            "O SKILL_ID configurado é diferente do ID detectado; a Alexa pode "
+            "responder 'problema com a resposta da skill'."
+        ),
+        "warning_skill_id_unverified": (
+            "SKILL_ID está preenchido, mas o ID da skill ainda não foi "
+            "detectado. Confira no console da Amazon ou execute o /setup."
         ),
         "warning_manual_mode": (
             "No modo manual, os valores precisam ser configurados no contêiner "
@@ -90,9 +90,9 @@ _TEXTS: dict[str, dict[str, Any]] = {
             "Configure SKILL_HOSTNAME, MA_HOSTNAME e os túneis HTTPS.",
             "Abra http://<add-on>:5000/setup na rede local.",
             "Faça login na Amazon manualmente e cole o código.",
-            "Aguarde o Skill ID e habilite testing.",
+            "Aguarde o Skill ID; a integração detecta e sugere o valor.",
             "Salve o Skill ID nas opções da integração/add-on.",
-            "Habilite a skill no app Alexa e teste a frase de invocação.",
+            "Habilite a skill no app Alexa e teste 'Alexa, abra music assistant'.",
         ],
     },
     "en": {
@@ -115,10 +115,15 @@ _TEXTS: dict[str, dict[str, Any]] = {
         "action_testing": (
             "Enable testing in the Amazon developer console (Development)."
         ),
-        "action_skill_id": ("Copy the Skill ID to the integration/add-on options."),
-        "action_invocation": (
-            "The selected locale has no invocation name upstream; "
-            "use another locale or adjust the model."
+        "action_skill_id": (
+            "Copy the Skill ID to the integration/add-on options and restart."
+        ),
+        "action_skill_id_suggested": (
+            "Set SKILL_ID to {skill_id} in the options and restart the add-on."
+        ),
+        "action_skill_id_mismatch": (
+            "The configured SKILL_ID does not match the detected skill. "
+            "Update it to {skill_id} and restart the add-on."
         ),
         "action_stream": ("Check DNS, the tunnel, and the MA_HOSTNAME certificate."),
         "warning_manual_login": "The Amazon login is always manual.",
@@ -127,8 +132,8 @@ _TEXTS: dict[str, dict[str, Any]] = {
             "If more than one exists, it deletes the extras and keeps the first."
         ),
         "warning_display_name": (
-            "The manifest creates the display name 'Music Assistant'; "
-            "the invocation name comes from the interaction model."
+            "The manifest creates the display name 'Music Assistant' and the "
+            "invocation name is 'music assistant' for every locale."
         ),
         "warning_public_exposure": (
             "Expose only POST /; keep /setup and /status on the local network."
@@ -140,8 +145,17 @@ _TEXTS: dict[str, dict[str, Any]] = {
             "The manifest uses sslCertificateType: Wildcard; change it to Trusted "
             "if Amazon rejects the endpoint."
         ),
-        "warning_locale_invocation": (
-            "This locale has no invocation name upstream; skill creation may fail."
+        "warning_skill_id_empty": (
+            "SKILL_ID is empty; the skill accepts any skill signed by Amazon. "
+            "Set the detected ID."
+        ),
+        "warning_skill_id_mismatch": (
+            "The configured SKILL_ID differs from the detected ID; Alexa may "
+            "answer 'there was a problem with the skill's response'."
+        ),
+        "warning_skill_id_unverified": (
+            "SKILL_ID is set, but the skill ID has not been detected yet. "
+            "Check the Amazon console or run /setup."
         ),
         "warning_manual_mode": (
             "In manual mode, configure these values in the external container; "
@@ -151,9 +165,9 @@ _TEXTS: dict[str, dict[str, Any]] = {
             "Configure SKILL_HOSTNAME, MA_HOSTNAME, and the HTTPS tunnels.",
             "Open http://<add-on>:5000/setup on the local network.",
             "Log in to Amazon manually and paste the code.",
-            "Wait for the Skill ID and enable testing.",
+            "Wait for the Skill ID; the integration detects and suggests it.",
             "Save the Skill ID in the integration/add-on options.",
-            "Enable the skill in the Alexa app and test the invocation phrase.",
+            "Enable the skill in the Alexa app and test 'Alexa, open music assistant'.",
         ],
     },
 }
@@ -174,9 +188,11 @@ def _skill_flags(
     return skill_found, endpoint_matches, testing_enabled
 
 
-def _invocation(locale: str) -> tuple[str, str | None]:
-    """Return the invocation name and usage example for a locale."""
-    return INVOCATION_NAMES.get(locale, ("", None))
+def _usage_example(language_key: str) -> str:
+    """Return a localized usage example for the fixed invocation name."""
+    if language_key == "pt":
+        return f"Alexa, abra {INVOCATION_NAME}"
+    return f"Alexa, open {INVOCATION_NAME}"
 
 
 def build_setup_checklist(
@@ -191,9 +207,17 @@ def build_setup_checklist(
     managed = bool(config.get(CONF_MANAGED, True))
     skill_hostname = str(config.get(CONF_SKILL_HOSTNAME) or "").strip()
     locale = str(config.get(CONF_LOCALE) or DEFAULT_LOCALE)
-    skill_id = str(config.get(CONF_SKILL_ID) or "").strip()
-    invocation, usage_example = _invocation(locale)
+    configured_skill_id = (
+        data.configured_skill_id or str(config.get(CONF_SKILL_ID) or "").strip()
+    )
+    detected_skill_id = data.detected_skill_id
+    suggested_skill_id = data.suggested_skill_id
+    skill_id_matches = data.skill_id_matches
+    invocation = INVOCATION_NAME
+    usage_example = _usage_example(language_key)
     skill_found, endpoint_matches, testing_enabled = _skill_flags(data)
+
+    skill_id_done = bool(configured_skill_id) and skill_id_matches is not False
 
     stream_present = data.stream_url_present
     stream_done: bool | None = data.https_stream_ok if stream_present else None
@@ -204,8 +228,8 @@ def build_setup_checklist(
         {"step": text["skill_found"], "done": skill_found},
         {"step": text["endpoint_matches"], "done": endpoint_matches},
         {"step": text["testing_enabled"], "done": testing_enabled},
-        {"step": text["skill_id"], "done": bool(skill_id)},
-        {"step": text["invocation"], "done": bool(invocation)},
+        {"step": text["skill_id"], "done": skill_id_done},
+        {"step": text["invocation"], "done": True},
         {"step": text["https_stream"], "done": stream_done},
     ]
 
@@ -220,10 +244,17 @@ def build_setup_checklist(
         next_actions.append(text["action_endpoint"])
     if not testing_enabled:
         next_actions.append(text["action_testing"])
-    if not skill_id:
-        next_actions.append(text["action_skill_id"])
-    if not invocation:
-        next_actions.append(text["action_invocation"])
+    if not configured_skill_id:
+        if suggested_skill_id:
+            next_actions.append(
+                text["action_skill_id_suggested"].format(skill_id=suggested_skill_id)
+            )
+        else:
+            next_actions.append(text["action_skill_id"])
+    elif skill_id_matches is False and suggested_skill_id:
+        next_actions.append(
+            text["action_skill_id_mismatch"].format(skill_id=suggested_skill_id)
+        )
     if stream_present and not data.https_stream_ok:
         next_actions.append(text["action_stream"])
 
@@ -235,8 +266,12 @@ def build_setup_checklist(
         text["warning_tls"],
         text["warning_certificate"],
     ]
-    if not invocation:
-        warnings.append(text["warning_locale_invocation"])
+    if not configured_skill_id:
+        warnings.append(text["warning_skill_id_empty"])
+    elif skill_id_matches is False:
+        warnings.append(text["warning_skill_id_mismatch"])
+    elif detected_skill_id is None:
+        warnings.append(text["warning_skill_id_unverified"])
     if not managed:
         warnings.append(text["warning_manual_mode"])
 
@@ -256,8 +291,7 @@ def build_setup_checklist(
             skill_found,
             endpoint_matches,
             testing_enabled,
-            bool(skill_id),
-            bool(invocation),
+            skill_id_done,
             stream_ok,
         )
     )
@@ -267,11 +301,14 @@ def build_setup_checklist(
 
     console_values = {
         "skill_name": SKILL_NAME,
-        "invocation_name": invocation or None,
+        "invocation_name": invocation,
+        "invocation_source": INVOCATION_SOURCE,
         "usage_example": usage_example,
         "endpoint_url": endpoint_url,
         "locale": locale,
-        "skill_id": skill_id or None,
+        "skill_id": configured_skill_id or None,
+        "detected_skill_id": detected_skill_id,
+        "suggested_skill_id": suggested_skill_id,
         "amazon_console_url": AMAZON_CONSOLE_URL,
         "ssl_certificate_type": SSL_CERTIFICATE_TYPE,
         "testing_enabled": testing_enabled,
@@ -280,11 +317,16 @@ def build_setup_checklist(
 
     attributes = {
         "skill_name": SKILL_NAME,
-        "invocation_name": invocation or None,
+        "invocation_name": invocation,
+        "invocation_source": INVOCATION_SOURCE,
         "usage_example": usage_example,
         "endpoint_url": endpoint_url,
         "locale": locale,
-        "skill_id": skill_id or None,
+        "skill_id": configured_skill_id or None,
+        "configured_skill_id": configured_skill_id or None,
+        "detected_skill_id": detected_skill_id,
+        "suggested_skill_id": suggested_skill_id,
+        "skill_id_matches": skill_id_matches,
         "amazon_console_url": AMAZON_CONSOLE_URL,
         "ssl_certificate_type": SSL_CERTIFICATE_TYPE,
         "cloudflare_rule": cloudflare_rule,

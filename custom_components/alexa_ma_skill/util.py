@@ -18,6 +18,7 @@ _STREAM_JSON_RE = re.compile(
     r'("(?:streamUrl|audioSources)"\s*:\s*")[^"]*(")',
     re.IGNORECASE,
 )
+_SKILL_ID_RE = re.compile(r"amzn1\.ask\.skill\.[0-9A-Za-z\-]+")
 
 
 def entry_config(entry: ConfigEntry) -> dict[str, Any]:
@@ -83,6 +84,30 @@ def redact_stream_urls(value: str) -> str:
     if not value:
         return ""
     return _STREAM_JSON_RE.sub(r"\1**REDACTED**\2", value)
+
+
+def extract_skill_id(value: str) -> str | None:
+    """Return the last Alexa skill ID found in text, if any."""
+    if not value:
+        return None
+    matches = _SKILL_ID_RE.findall(value)
+    return matches[-1] if matches else None
+
+
+def mask_skill_id(value: str | None) -> str | None:
+    """Mask a skill ID, keeping only the start and the end."""
+    if not value:
+        return None
+    if len(value) <= 16:
+        return "***"
+    return f"{value[:16]}...{value[-6:]}"
+
+
+def mask_skill_ids_in_text(value: str) -> str:
+    """Mask every skill ID embedded in a text value."""
+    if not value:
+        return ""
+    return _SKILL_ID_RE.sub(lambda match: mask_skill_id(match.group(0)) or "***", value)
 
 
 def skill_linked(skill_ask_html: str, level: StatusLevel) -> bool:

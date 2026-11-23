@@ -133,7 +133,7 @@
           "locale": "Locale used when creating and enabling the Alexa skill.",
           "enable_apl": "Enable Alexa Presentation Language on display-capable devices.",
           "skip_url_validation": "Do not validate the Music Assistant stream URL before sending it to Alexa.",
-          "skill_id": "Skill ID returned by the setup flow, used to restrict requests to this skill.",
+          "skill_id": "Skill ID returned by the setup flow, used to restrict requests to this skill. Leave empty to use the detected value when available.",
           "ma_api_url": "Base URL of the Music Assistant WebSocket API on port 8095. This is not the stream port 8097.",
           "ma_api_token": "Leave empty to keep the current token. Clear MA_API_URL to remove both.",
           "scan_interval": "Cheap status polling interval, from 10 to 300 seconds. The detailed ASK check remains at about 5 minutes.",
@@ -166,6 +166,9 @@
       },
       "skill_linked": {
         "name": "Skill linked"
+      },
+      "skill_id_valid": {
+        "name": "Skill ID valid"
       }
     },
     "sensor": {

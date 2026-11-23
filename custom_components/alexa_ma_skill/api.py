@@ -11,8 +11,13 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DETAILED_REQUEST_TIMEOUT, REQUEST_TIMEOUT, StatusLevel
-from .util import parse_json_pre
+from .const import (
+    DETAILED_REQUEST_TIMEOUT,
+    REQUEST_TIMEOUT,
+    SETUP_REQUEST_TIMEOUT,
+    StatusLevel,
+)
+from .util import extract_skill_id, parse_json_pre
 
 _LED_RE = re.compile(r'class="led (green|yellow|red)"')
 
@@ -57,6 +62,18 @@ class DetailedStatus:
     alexa_api_level: StatusLevel
     ma_api_details: dict[str, Any] | None = None
     stream_url: str | None = None
+    detected_skill_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SetupStatus:
+    """Parsed payload from the setup endpoint."""
+
+    logs: tuple[str, ...]
+    auth_url: str | None
+    active: bool
+    created: bool
+    skill_id: str | None
 
 
 class AlexaMaSkillApi:
@@ -132,6 +149,46 @@ class AlexaMaSkillApi:
             alexa_api_level=_parse_level(data.get("alexa_api_html")),
             ma_api_details=ma_api_details,
             stream_url=stream_url,
+            detected_skill_id=extract_skill_id(_as_text(data.get("skill_ask_html"))),
+        )
+
+    async def async_get_setup_status(self) -> SetupStatus:
+        """Return the setup logs and the last detected skill ID."""
+        text, _status = await self._async_request(
+            "GET",
+            "/setup?format=json",
+            accept="application/json",
+            timeout=SETUP_REQUEST_TIMEOUT,
+        )
+        try:
+            data = json.loads(text)
+        except (TypeError, ValueError) as err:
+            raise AlexaMaSkillResponseError(
+                f"Invalid JSON from /setup?format=json: {err}"
+            ) from err
+        if not isinstance(data, dict):
+            raise AlexaMaSkillResponseError(
+                "/setup?format=json did not return a JSON object"
+            )
+
+        raw_logs = data.get("logs")
+        logs = (
+            tuple(_as_text(line) for line in raw_logs)
+            if isinstance(raw_logs, list)
+            else ()
+        )
+        skill_id = None
+        for line in reversed(logs):
+            skill_id = extract_skill_id(line)
+            if skill_id:
+                break
+        auth_url = data.get("auth_url")
+        return SetupStatus(
+            logs=logs,
+            auth_url=auth_url if isinstance(auth_url, str) and auth_url else None,
+            active=bool(data.get("active", False)),
+            created=bool(data.get("created", False)),
+            skill_id=skill_id,
         )
 
     async def _async_request(

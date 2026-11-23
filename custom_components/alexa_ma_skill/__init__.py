@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.storage import Store
 
 from .api import AlexaMaSkillApi
 from .const import (
@@ -16,6 +17,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_SCAN_INTERVAL,
     CONF_SKILL_HOSTNAME,
+    CONF_SKILL_ID,
     CONF_USERNAME,
     DEFAULT_BASE_URL,
     DEFAULT_SCAN_INTERVAL,
@@ -23,6 +25,7 @@ from .const import (
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
     PLATFORMS,
+    STORAGE_VERSION,
 )
 from .coordinator import AlexaMaSkillCoordinator
 from .supervisor import AlexaMaSkillSupervisor
@@ -63,6 +66,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ignore_https=bool(config.get(CONF_IGNORE_HTTPS, False)),
     )
     supervisor = AlexaMaSkillSupervisor(hass)
+    store: Store[dict[str, str]] = Store(
+        hass,
+        STORAGE_VERSION,
+        f"{DOMAIN}.{entry.entry_id}.skill_id",
+    )
+    stored = await store.async_load()
+    detected_skill_id = None
+    if isinstance(stored, dict):
+        stored_skill_id = stored.get("detected_skill_id")
+        if isinstance(stored_skill_id, str) and stored_skill_id:
+            detected_skill_id = stored_skill_id
     coordinator = AlexaMaSkillCoordinator(
         hass,
         api,
@@ -71,6 +85,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ma_hostname=str(config.get(CONF_MA_HOSTNAME) or ""),
         ignore_https=bool(config.get(CONF_IGNORE_HTTPS, False)),
         scan_interval=scan_interval,
+        store=store,
+        configured_skill_id=str(config.get(CONF_SKILL_ID) or ""),
+        initial_detected_skill_id=detected_skill_id,
     )
     await coordinator.async_config_entry_first_refresh()
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -28,11 +29,27 @@ def _skill_linked(data: AlexaMaSkillData) -> bool:
     return skill_linked(detailed.skill_ask_html, detailed.skill_ask_level)
 
 
+def _skill_id_valid(data: AlexaMaSkillData) -> bool:
+    """Return True when the configured skill ID is present and not divergent."""
+    return bool(data.configured_skill_id) and data.skill_id_matches is not False
+
+
+def _skill_id_attributes(data: AlexaMaSkillData) -> dict[str, Any]:
+    """Return the configured, detected, and suggested skill IDs."""
+    return {
+        "configured_skill_id": data.configured_skill_id or None,
+        "detected_skill_id": data.detected_skill_id,
+        "suggested_skill_id": data.suggested_skill_id,
+        "skill_id_matches": data.skill_id_matches,
+    }
+
+
 @dataclass(frozen=True, kw_only=True)
 class AlexaMaSkillBinarySensorDescription(BinarySensorEntityDescription):
     """Description of an Alexa MA Skill binary sensor."""
 
     value_fn: Callable[[AlexaMaSkillData], bool]
+    attributes_fn: Callable[[AlexaMaSkillData], dict[str, Any]] | None = None
 
 
 BINARY_SENSORS: tuple[AlexaMaSkillBinarySensorDescription, ...] = (
@@ -63,6 +80,14 @@ BINARY_SENSORS: tuple[AlexaMaSkillBinarySensorDescription, ...] = (
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_skill_linked,
+    ),
+    AlexaMaSkillBinarySensorDescription(
+        key="skill_id_valid",
+        translation_key="skill_id_valid",
+        icon="mdi:identifier",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_skill_id_valid,
+        attributes_fn=_skill_id_attributes,
     ),
 )
 
@@ -102,3 +127,11 @@ class AlexaMaSkillBinarySensor(AlexaMaSkillEntity, BinarySensorEntity):
         if self.coordinator.data is None or not self.coordinator.last_update_success:
             return False
         return self.entity_description.value_fn(self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra attributes for sensors that expose them."""
+        attributes_fn = self.entity_description.attributes_fn
+        if attributes_fn is None or self.coordinator.data is None:
+            return None
+        return attributes_fn(self.coordinator.data)

@@ -133,7 +133,7 @@
           "locale": "Idioma usado ao criar e habilitar a skill Alexa.",
           "enable_apl": "Habilita Alexa Presentation Language em dispositivos com tela.",
           "skip_url_validation": "Não valida a URL do stream do Music Assistant antes de enviá-la à Alexa.",
-          "skill_id": "ID retornado pelo setup, usado para restringir as requisições a esta skill.",
+          "skill_id": "ID retornado pelo setup, usado para restringir as requisições a esta skill. Deixe em branco para usar o valor detectado quando disponível.",
           "ma_api_url": "URL base da API WebSocket do Music Assistant na porta 8095. Não é a porta de stream 8097.",
           "ma_api_token": "Deixe em branco para manter o token atual. Limpe MA_API_URL para remover os dois.",
           "scan_interval": "Intervalo do status barato, de 10 a 300 segundos. A checagem detalhada do ASK continua em cerca de 5 minutos.",
@@ -166,6 +166,9 @@
       },
       "skill_linked": {
         "name": "Skill vinculada"
+      },
+      "skill_id_valid": {
+        "name": "ID da skill válido"
       }
     },
     "sensor": {

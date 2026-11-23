@@ -57,6 +57,10 @@ def _overall_status(data: AlexaMaSkillData) -> str:
         return "error"
     if data.stream_url_present and not data.https_stream_ok:
         return "error"
+    if data.skill_id_matches is False:
+        return "error"
+    if not data.configured_skill_id:
+        return "warning"
     if any(level in (StatusLevel.YELLOW, StatusLevel.UNKNOWN) for level in levels):
         return "warning"
     if not skill_linked(detailed.skill_ask_html, detailed.skill_ask_level):

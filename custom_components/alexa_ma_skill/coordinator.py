@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -27,7 +28,7 @@ from .supervisor import (
     SupervisorOperationError,
     SupervisorUnavailableError,
 )
-from .util import public_stream_url
+from .util import mask_skill_id, public_stream_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +47,10 @@ class AlexaMaSkillData:
     https_skill_ok: bool
     https_stream_ok: bool
     stream_url_present: bool
+    detected_skill_id: str | None
+    configured_skill_id: str
+    skill_id_matches: bool | None
+    suggested_skill_id: str | None
 
 
 class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
@@ -61,6 +66,9 @@ class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
         ma_hostname: str = "",
         ignore_https: bool = False,
         scan_interval: int = DEFAULT_SCAN_INTERVAL,
+        store: Store | None = None,
+        configured_skill_id: str = "",
+        initial_detected_skill_id: str | None = None,
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -80,6 +88,9 @@ class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
         self._last_check: datetime | None = None
         self._detailed_error: str | None = None
         self._addon_version: str | None = None
+        self._store = store
+        self._configured_skill_id = configured_skill_id.strip()
+        self._detected_skill_id = initial_detected_skill_id
 
     async def _async_update_data(self) -> AlexaMaSkillData:
         """Fetch the cheap status every poll and the detailed status every 5 min."""
@@ -128,6 +139,34 @@ class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
                 self._last_check = datetime.now(UTC)
                 self._detailed_error = None
 
+        detected_skill_id: str | None = None
+        try:
+            setup = await self.api.async_get_setup_status()
+        except AlexaMaSkillApiError as err:
+            # The setup endpoint is optional for the other entities. A short
+            # timeout keeps this poll cheap; failures stay at debug level.
+            _LOGGER.debug("Setup status check failed: %s", err)
+        else:
+            if setup.skill_id:
+                detected_skill_id = setup.skill_id
+        if detected_skill_id is None and self._detailed is not None:
+            detected_skill_id = self._detailed.detected_skill_id
+        if detected_skill_id is None:
+            detected_skill_id = self._detected_skill_id
+        if detected_skill_id and detected_skill_id != self._detected_skill_id:
+            self._detected_skill_id = detected_skill_id
+            await self._async_save_detected_skill_id(detected_skill_id)
+
+        if not self._configured_skill_id:
+            skill_id_matches: bool | None = None
+            suggested_skill_id = detected_skill_id
+        elif detected_skill_id is None:
+            skill_id_matches = None
+            suggested_skill_id = None
+        else:
+            skill_id_matches = self._configured_skill_id == detected_skill_id
+            suggested_skill_id = None if skill_id_matches else detected_skill_id
+
         https_skill_ok = False
         if self._skill_hostname:
             https_skill_ok = await self._https_cache.async_check_skill(
@@ -159,4 +198,18 @@ class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
             https_skill_ok=https_skill_ok,
             https_stream_ok=https_stream_ok,
             stream_url_present=stream_url_present,
+            detected_skill_id=detected_skill_id,
+            configured_skill_id=self._configured_skill_id,
+            skill_id_matches=skill_id_matches,
+            suggested_skill_id=suggested_skill_id,
         )
+
+    async def _async_save_detected_skill_id(self, skill_id: str) -> None:
+        """Persist the last detected skill ID across add-on restarts."""
+        if self._store is None:
+            return
+        _LOGGER.debug("Detected Alexa skill ID %s", mask_skill_id(skill_id))
+        try:
+            await self._store.async_save({"detected_skill_id": skill_id})
+        except OSError as err:
+            _LOGGER.debug("Could not persist the detected skill ID: %s", err)

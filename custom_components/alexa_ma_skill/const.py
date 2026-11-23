@@ -39,9 +39,21 @@ MAX_SCAN_INTERVAL = 300
 DETAILED_SCAN_INTERVAL = timedelta(minutes=5)
 REQUEST_TIMEOUT = 10
 DETAILED_REQUEST_TIMEOUT = 30
+# The setup endpoint is local and cheap, but its logs can be large. Keep the
+# polling timeout short so a slow add-on never delays the other entities.
+SETUP_REQUEST_TIMEOUT = 3
 
 ADDON_START_TIMEOUT = 90
 ADDON_START_POLL_INTERVAL = 2
+
+STORAGE_VERSION = 1
+
+# The upstream scripts/ask_create_skill.sh overwrites the invocationName of
+# every interaction model with this value before uploading it to Amazon. The
+# container does not expose the invocationName through any endpoint, so this
+# constant must stay in sync with that script.
+INVOCATION_NAME = "music assistant"
+INVOCATION_SOURCE = "scripts/ask_create_skill.sh"
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR]
 

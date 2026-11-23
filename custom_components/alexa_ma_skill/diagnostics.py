@@ -12,7 +12,12 @@ from .api import DetailedStatus
 from .const import CONF_MA_API_TOKEN, CONF_PASSWORD, DOMAIN
 from .coordinator import AlexaMaSkillData
 from .supervisor import SupervisorOperationError, SupervisorUnavailableError
-from .util import html_to_text, redact_stream_urls
+from .util import (
+    html_to_text,
+    mask_skill_id,
+    mask_skill_ids_in_text,
+    redact_stream_urls,
+)
 
 TO_REDACT = {
     CONF_PASSWORD,
@@ -30,8 +35,27 @@ TO_REDACT = {
 
 
 def _clean_text(value: str) -> str:
-    """Strip HTML and redact stream URLs from diagnostics text."""
-    return redact_stream_urls(html_to_text(value))
+    """Strip HTML, redact stream URLs, and mask skill IDs from diagnostics."""
+    return mask_skill_ids_in_text(redact_stream_urls(html_to_text(value)))
+
+
+def _mask_skill_id_fields(value: Any) -> Any:
+    """Recursively mask skill ID fields in diagnostics payloads."""
+    if isinstance(value, dict):
+        masked: dict[Any, Any] = {}
+        for key, item in value.items():
+            if (
+                isinstance(key, str)
+                and key.lower() == "skill_id"
+                and isinstance(item, str)
+            ):
+                masked[key] = mask_skill_id(item)
+            else:
+                masked[key] = _mask_skill_id_fields(item)
+        return masked
+    if isinstance(value, list):
+        return [_mask_skill_id_fields(item) for item in value]
+    return value
 
 
 def _detailed_data(detailed: DetailedStatus | None) -> dict[str, Any] | None:
@@ -50,6 +74,7 @@ def _detailed_data(detailed: DetailedStatus | None) -> dict[str, Any] | None:
         "alexa_api_level": detailed.alexa_api_level.value,
         "ma_api_details": detailed.ma_api_details,
         "stream_url": detailed.stream_url,
+        "detected_skill_id": mask_skill_id(detailed.detected_skill_id),
     }
 
 
@@ -67,6 +92,10 @@ def _coordinator_data(data: AlexaMaSkillData | None) -> dict[str, Any] | None:
         "https_skill_ok": data.https_skill_ok,
         "https_stream_ok": data.https_stream_ok,
         "stream_url_present": data.stream_url_present,
+        "configured_skill_id": mask_skill_id(data.configured_skill_id),
+        "detected_skill_id": mask_skill_id(data.detected_skill_id),
+        "suggested_skill_id": mask_skill_id(data.suggested_skill_id),
+        "skill_id_matches": data.skill_id_matches,
         "detailed": _detailed_data(data.detailed),
     }
 
@@ -112,4 +141,4 @@ async def async_get_config_entry_diagnostics(
         else:
             diagnostics["addon"] = {"available": False}
 
-    return async_redact_data(diagnostics, TO_REDACT)
+    return _mask_skill_id_fields(async_redact_data(diagnostics, TO_REDACT))
