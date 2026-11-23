@@ -105,7 +105,7 @@ do host escolhida nos URLs locais e no túnel.
 | `AWS_DEFAULT_REGION` | Não | `us-east-1` | Região usada pelo ASK CLI. |
 | `ENABLE_APL` | Não | `false` | Habilita APL em dispositivos com tela. |
 | `SKIP_URL_VALIDATION` | Não | `false` | Não valida a URL do stream antes de enviá-la à Alexa. |
-| `SKILL_ID` | Não | — | ID `amzn1.ask.skill...` para restringir a skill às próprias requisições. |
+| `SKILL_ID` | Não | — | ID `amzn1.ask.skill...` para restringir a skill às próprias requisições. A integração detecta e sugere o valor. |
 | `MA_API_URL` | Não** | — | URL base da API WebSocket do Music Assistant, porta `8095`. |
 | `MA_API_TOKEN` | Não** | — | Token da API do Music Assistant. |
 
@@ -238,6 +238,19 @@ Se o túnel roda como add-on no mesmo Home Assistant, use o IP do host ou o
 nome que o add-on do túnel consegue resolver. O add-on publica a porta `5000`
 no host.
 
+### Ordem das rotas no Cloudflare
+
+Se você usa rotas curinga (`*.exemplo.com`), coloque as rotas específicas
+**antes** delas:
+
+1. `skill.exemplo.com` → `http://<IP_DO_HOME_ASSISTANT>:5000`
+2. `ma.exemplo.com` → `http://<IP_DO_MUSIC_ASSISTANT>:8097`
+3. `*.exemplo.com` (catch-all) por último
+
+Quando a rota curinga vem primeiro, o pedido cai no Traefik e retorna um
+`404 page not found` em texto puro, mesmo com o túnel ativo. Reordene as rotas
+para que as específicas tenham prioridade.
+
 ### Outros túneis ou reverse proxy
 
 O mesmo princípio se aplica:
@@ -270,19 +283,23 @@ O mesmo princípio se aplica:
    - aguarda a compilação dos modelos;
    - tenta habilitar a skill para testes.
 9. Quando aparecer `Done. Skill ID: amzn1.ask.skill...`, copie o ID.
+   - A integração personalizada (Fase 2) lê esse ID automaticamente do
+     `/setup`, avisa quando `SKILL_ID` está vazio ou divergente e sugere o
+     valor correto.
 10. Volte às opções do add-on, preencha `SKILL_ID` com esse valor e reinicie o
     add-on. Isso restringe a skill às requisições destinadas a ela.
 11. No aplicativo Alexa, abra **Mais > Skills > Suas Skills > Dev** (ou
     **Em desenvolvimento**) e habilite a skill.
-12. Teste com a frase de invocação do idioma configurado:
-    - `pt-BR`: **"Alexa, abra minha rádio"**
-    - `en-US`: **"Alexa, open my radio"**
+12. Invoque a skill com **"Alexa, abra music assistant"** (ou
+    **"Alexa, open music assistant"**). O invocation é **`music assistant`** em
+    todos os idiomas.
 
-> **Nome da skill:** o manifesto construído pelo upstream define o nome de
-> exibição **"Music Assistant"**. A frase de invocação vem do modelo de
-> interação (por exemplo, **"minha rádio"** em `pt-BR` e **"my radio"** em
-> `en-US`). O nome não é "Alexa MA Skill". Consulte o console da Amazon para
-> confirmar.
+> **Nome e invocação:** o manifesto construído pelo upstream define o nome de
+> exibição **"Music Assistant"**. O `scripts/ask_create_skill.sh` sobrescreve o
+> `invocationName` de todos os modelos para **`music assistant`**, então os
+> valores dos modelos brutos (`minha rádio`, `my radio` etc.) não são usados.
+> O console da Amazon mostra o nome de exibição e a frase de invocação
+> efetivamente criados.
 
 ### Aviso sobre skills existentes
 
@@ -296,8 +313,8 @@ Ele não apaga outras skills. Ainda assim, revise o console da Amazon antes de
 executar o setup em uma conta que já tenha skills.
 
 O script cria ou reutiliza uma skill chamada "Music Assistant". O nome de
-exibição no console é "Music Assistant"; a frase de invocação vem do modelo de
-interação.
+exibição no console é "Music Assistant"; o invocation é `music assistant` em
+todos os locales.
 
 ### Tipo de certificado no manifesto
 
@@ -389,8 +406,49 @@ Não faça chamadas públicas a `/status`.
 - Confirme que a skill está habilitada em **Skills > Suas Skills > Dev**.
 - Use a mesma conta Amazon no aplicativo Alexa e no console de desenvolvedor.
 - Confirme o idioma da skill e a frase de invocação.
-- Em `pt-BR`, tente **"Alexa, abra minha rádio"**.
-- Em `en-US`, tente **"Alexa, open my radio"**.
+- Invoque com **"Alexa, abra music assistant"** (ou
+  **"Alexa, open music assistant"**). O invocation é `music assistant` em todos
+  os locales.
+
+### `Skill ID Verification failed!!` / "problema com a resposta da skill"
+
+- O `SKILL_ID` configurado não corresponde ao ID da skill criada.
+- O ID correto aparece nos logs de `/setup` como `Done. Skill ID:` e também
+  pode aparecer no `/status`.
+- A integração personalizada detecta o ID e sugere o valor correto no checklist
+  e no `binary_sensor.skill_id_valid`.
+- Corrija `SKILL_ID`, reinicie o add-on e teste novamente.
+- Sem `SKILL_ID`, a skill aceita qualquer skill assinada pela Amazon. Prefira
+  preencher o valor.
+
+### Cloudflare retorna `404 page not found` em texto puro
+
+- As rotas curinga (`*.exemplo.com`) estão vindo **antes** das rotas
+  específicas `skill.exemplo.com` e `ma.exemplo.com`.
+- O pedido cai no Traefik e não chega ao add-on.
+- Reordene as rotas: específicas primeiro, catch-all/curinga por último.
+
+### Music Assistant: `Non-base32 digit found` / `internal_error`
+
+- O campo **OTP Secret** do Music Assistant está com um valor inválido.
+- Se você não tem uma chave TOTP válida, deixe **OTP Secret vazio**.
+- Limpe o campo, salve e teste novamente.
+
+### Music Assistant: `amazon.com.br does not match account domain amazon.com`
+
+- Se o áudio toca normalmente, esse aviso pode ser ignorado.
+- Ele indica que o domínio da conta Alexa não corresponde ao esperado pelo
+  provider.
+- Alternativa: reconfigurar a conta/provider Alexa no Music Assistant com o
+  domínio correto da conta (por exemplo, `amazon.com`).
+
+### Nenhum `POST /` aparece no log
+
+- `QUIET_HTTP=1` é fixado pelo `run.sh` e esconde os logs HTTP do
+  werkzeug/urllib3, inclusive os `POST /`.
+- Não conclua que a skill não recebeu requisições apenas pela ausência de
+  logs.
+- Use `/status` (recent invocations) ou `/invocations` como indicador.
 
 ### O áudio não toca
 
@@ -426,8 +484,8 @@ Não faça chamadas públicas a `/status`.
 - O script procura skills chamadas exatamente "Music Assistant".
 - Se houver uma, reutiliza; se houver mais de uma, apaga as extras e mantém a
   primeira.
-- O nome de exibição criado é "Music Assistant"; a frase de invocação vem do
-  modelo de interação.
+- O nome de exibição criado é "Music Assistant"; o invocation é `music assistant`
+  em todos os locales.
 
 ## Segurança
 
@@ -464,10 +522,10 @@ Trate o backup como material sensível.
   `Dockerfile`. Atualizações exigem alterar essa linha e a versão do add-on.
 - O login da Amazon no setup é manual; não há autenticação totalmente headless.
 - O script upstream pode apagar skills extras chamadas "Music Assistant"
-  quando há mais de uma. O nome de exibição criado é "Music Assistant" e a
-  frase de invocação vem do modelo de interação.
-- `fr-CA` e `nl-NL` têm frase de invocação vazia no upstream; a criação da
-  skill pode falhar nesses locales.
+  quando há mais de uma. O nome de exibição criado é "Music Assistant" e o
+  invocation é `music assistant` em todos os locales.
+- `fr-CA` e `nl-NL` têm modelos brutos com invocation vazio; o script injeta
+  `music assistant`, mas a criação nesses locales **não foi validada**.
 - O manifesto gerado usa `sslCertificateType: Wildcard`; ajuste para `Trusted`
   no console se necessário.
 - `MA_HOSTNAME` remove a porta da URL do stream; o túnel precisa mapear o
@@ -492,13 +550,17 @@ Trate o backup como material sensível.
    `Done. Skill ID: ...`.
 7. Set `SKILL_ID` to that value and restart the add-on.
 8. Enable the skill in the Alexa app under **Skills > Your Skills > Dev**.
-9. Say **"Alexa, open my radio"**.
+9. Say **"Alexa, open music assistant"**. The display name is **Music
+   Assistant**, and the invocation name is **`music assistant`** for every
+   locale.
 10. For Music Assistant player commands, set `MA_API_URL` to the WebSocket API
     on port `8095` and `MA_API_TOKEN` if required.
 
 Public exposure: allow only `POST /` on `SKILL_HOSTNAME`. Keep `/setup`,
 `/status`, `/devices`, `/docs`, `/ma`, and `/alexa` on the local network. Use
-TLS 1.2 or newer; TLS 1.3 is not supported by the upstream image.
+TLS 1.2 or newer; TLS 1.3 is not supported by the upstream image. If you use
+wildcard routes, place the specific `skill` and `ma` routes before the wildcard
+catch-all, otherwise Traefik returns `404 page not found`.
 
 ## Licença
 

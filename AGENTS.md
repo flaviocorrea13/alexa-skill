@@ -255,10 +255,18 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
   - se houver uma, reutiliza;
   - se houver mais de uma, apaga as extras e mantém a primeira.
 - O manifesto construído pelo upstream sobrescreve o nome de exibição para
-  **"Music Assistant"**. A frase de invocação vem do modelo de interação
-  (por exemplo, **"minha rádio"** em `pt-BR` e **"my radio"** em `en-US`).
-- `fr-CA` e `nl-NL` têm frase de invocação vazia no upstream; a criação da
-  skill pode falhar nesses locales.
+  **"Music Assistant"**.
+- O `scripts/ask_create_skill.sh` do upstream sobrescreve o `invocationName`
+  de todos os modelos para **"music assistant"** antes do upload. O valor
+  final no console é `music assistant` em todos os locales; os valores dos
+  modelos brutos (`minha rádio`, `my radio` etc.) não são usados.
+- Não há endpoint no contêiner que exponha o `invocationName`. A integração
+  usa a constante `INVOCATION_NAME = "music assistant"` em `const.py`; se o
+  upstream mudar o script, essa constante precisa ser atualizada.
+- Os modelos brutos `fr-CA` e `nl-NL` têm `invocationName` vazio, mas o script
+  o substitui por `music assistant` antes do upload. A criação nesses locales
+  **não foi validada** por outros motivos (manifesto/ícones); não afirmar que a
+  falha é por invocation vazia.
 - O manifesto gerado usa `sslCertificateType: Wildcard`. Se a Amazon recusar o
   endpoint, ajustar para **Trusted** no console.
 - Ao final, copiar o `Done. Skill ID: amzn1.ask.skill...` para `SKILL_ID` e
@@ -286,6 +294,9 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 - Assistir o `/setup` com login manual na Amazon.
 - **Avisar explicitamente que o script upstream apaga skills extras chamadas
   "Music Assistant"** e pedir confirmação antes de continuar.
+- Detectar o Skill ID via `/status`/`/setup`, avisar quando vazio ou
+  divergente e sugerir o valor correto. Persistir o último ID detectado em
+  `Store` e expor em `binary_sensor.skill_id_valid` + checklist.
 
 ## 8. Regras de implementação
 
@@ -444,3 +455,61 @@ docker exec addon_alexa_ma_skill cat /data/generated_app_password
   - `scripts/find_skills_to_delete.py`: filtra skills "Music Assistant".
   - `app/skill.json`: manifesto e nomes por locale.
   - `app/models/*.json`: modelos de interação e frases de invocação.
+
+## 12. Lições do teste em HA OS
+
+O add-on foi instalado e testado em Home Assistant OS com um Echo real. Os
+itens abaixo são fatos observados e não devem ser revertidos sem novo teste.
+
+### 12.1 Invocação e nome da skill
+
+- A skill toca e responde quando invocada como **"music assistant"**, em todos
+  os locales.
+- O nome de exibição criado é **"Music Assistant"**.
+- O `invocationName` efetivo vem do `scripts/ask_create_skill.sh` do upstream,
+  que sobrescreve todos os modelos para `music assistant`.
+- O contêiner **não expõe** o `invocationName` em `/status`, `/setup` ou
+  `/simulator`. A integração usa a constante `INVOCATION_NAME` em `const.py`.
+- `fr-CA` e `nl-NL` têm modelos brutos com invocation vazio. O script injeta
+  `music assistant`, mas a **criação nesses locales não foi validada**.
+
+### 12.2 `SKILL_ID`
+
+- Com `SKILL_ID` errado, o contêiner registra `Skill ID Verification failed!!`
+  e a Alexa responde "problema com a resposta da skill".
+- O ID correto aparece nos logs de `/setup` (`Created skill:`,
+  `Reusing existing skill:` e `Done. Skill ID:`).
+- `/status` só expõe o ID em alguns casos (`skill_ask_html` no ramo "endpoint
+  not set").
+- Os logs de `/setup` ficam em memória e somem ao reiniciar o add-on; por isso
+  o último ID detectado é persistido em `Store` pela integração.
+- IDs devem ser mascarados em logs e diagnostics, mostrando apenas início e
+  fim.
+
+### 12.3 Cloudflare e Traefik
+
+- Rotas curinga (`*.dominio`) colocadas **antes** das rotas específicas fazem
+  o pedido cair no Traefik e retornar `404 page not found` em texto puro.
+- As rotas `SKILL_HOSTNAME` e `MA_HOSTNAME` devem vir **antes** das curingas.
+- Manter a rota catch-all/curinga por último.
+
+### 12.4 Music Assistant: OTP Secret
+
+- O campo **OTP Secret** deve ficar vazio quando não há chave TOTP válida.
+- Valor inválido causa `Non-base32 digit found` e `internal_error` no MA.
+
+### 12.5 Music Assistant: domínio da conta
+
+- O aviso `amazon.com.br does not match account domain amazon.com` pode ser
+  ignorado se o áudio tocar normalmente.
+- Alternativa: reconfigurar a conta/provider Alexa no MA com o domínio correto
+  da conta (por exemplo, `amazon.com`).
+
+### 12.6 `QUIET_HTTP=1`
+
+- `QUIET_HTTP=1` é fixado pelo `run.sh` e esconde os logs HTTP do
+  werkzeug/urllib3, inclusive os `POST /`.
+- Não concluir que a skill não recebeu requisições apenas pela ausência de
+  logs.
+- O melhor indicador é a página `/status` (recent invocations) ou
+  `/invocations`.

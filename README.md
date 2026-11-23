@@ -71,6 +71,9 @@ Decisões registradas para as próximas fases:
 5. Configure as opções. `SKILL_HOSTNAME` é obrigatório.
 6. Inicie o add-on.
 7. Abra `http://<IP_DO_HOME_ASSISTANT>:5000/setup` e siga o setup da skill.
+8. Depois de habilitar a skill no aplicativo Alexa, invoque com
+   **"Alexa, abra music assistant"**. O nome de exibição é **Music Assistant**;
+   o invocation é **`music assistant`** em todos os idiomas.
 
 A documentação completa está em
 [`alexa_ma_skill/DOCS.md`](alexa_ma_skill/DOCS.md).
@@ -89,7 +92,7 @@ A documentação completa está em
 | `AWS_DEFAULT_REGION` | Não | `us-east-1` | Região do ASK CLI. |
 | `ENABLE_APL` | Não | `false` | Habilita APL em dispositivos com tela. |
 | `SKIP_URL_VALIDATION` | Não | `false` | Pula a validação da URL de áudio. |
-| `SKILL_ID` | Não | — | Restringe a skill às próprias requisições. |
+| `SKILL_ID` | Não | — | Restringe a skill às próprias requisições. A integração detecta e sugere o valor. |
 | `MA_API_URL` | Não** | — | API WebSocket do Music Assistant (porta `8095`). |
 | `MA_API_TOKEN` | Não** | — | Token da API do Music Assistant. |
 
@@ -108,6 +111,25 @@ A documentação completa está em
   nos logs.
 - Proteja os backups do add-on: eles incluem as credenciais do ASK CLI.
 - Não use credenciais padrão como `admin`/`teste`.
+
+## Solução de problemas rápida
+
+- **`SKILL_ID` vazio ou errado:** com um ID incorreto, o contêiner registra
+  `Skill ID Verification failed!!` e a Alexa responde "problema com a resposta
+  da skill". A integração lê o ID nos logs de `/setup` e avisa quando vazio ou
+  divergente, sugerindo o valor correto. O ID aparece como `Done. Skill ID:`.
+- **Cloudflare/Traefik retorna `404 page not found` em texto puro:** as rotas
+  específicas de `SKILL_HOSTNAME` e `MA_HOSTNAME` devem vir **antes** das rotas
+  curinga (`*.dominio`). Deixe a curinga/catch-all por último.
+- **Music Assistant com `Non-base32 digit found`/`internal_error`:** deixe o
+  campo **OTP Secret** vazio quando não houver uma chave TOTP válida.
+- **Aviso `amazon.com.br does not match account domain amazon.com`:** pode ser
+  ignorado se o áudio tocar. Alternativa: reconfigurar a conta/provider Alexa
+  no MA com o domínio correto (por exemplo, `amazon.com`).
+- **Nenhum `POST /` aparece no log:** `QUIET_HTTP=1` esconde os logs HTTP. Use
+  `/status` (recent invocations) ou `/invocations` como indicador.
+- **Frase de invocação:** use **"music assistant"** em qualquer locale. O
+  script upstream sobrescreve o `invocationName` dos modelos.
 
 ## Estrutura do repositório
 
@@ -176,6 +198,9 @@ Quick start:
 3. Set `SKILL_HOSTNAME`, `MA_HOSTNAME`, `LOCALE`, and `TZ`.
 4. Start the add-on and open `http://<HA_IP>:5000/setup` on your local network.
 5. Follow the Amazon authorization flow and enable the skill in the Alexa app.
+6. Invoke the skill with **"Alexa, open music assistant"**. The display name is
+   **Music Assistant**, and the invocation name is **`music assistant`** for
+   every locale.
 
 Expose only `POST /` publicly. Keep `/setup`, `/status`, `/devices`, `/docs`,
 `/ma`, and `/alexa` on the local network. Use TLS 1.2 or newer.
