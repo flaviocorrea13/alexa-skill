@@ -191,6 +191,14 @@
       },
       "addon_version": {
         "name": "Versão do add-on"
+      },
+      "setup_checklist": {
+        "name": "Checklist de setup",
+        "state": {
+          "complete": "Completo",
+          "incomplete": "Incompleto",
+          "error": "Erro"
+        }
       }
     }
   }

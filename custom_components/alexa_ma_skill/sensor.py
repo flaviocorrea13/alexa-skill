@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -19,7 +19,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import StatusLevel
 from .coordinator import AlexaMaSkillCoordinator, AlexaMaSkillData
 from .entity import AlexaMaSkillEntity, get_coordinator
-from .util import html_to_text, redact_stream_urls, skill_linked
+from .setup import build_setup_checklist
+from .util import (
+    entry_config,
+    html_to_text,
+    redact_stream_urls,
+    skill_linked,
+)
 
 _MAX_STATE_LENGTH = 255
 
@@ -134,9 +140,11 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensors."""
     coordinator = get_coordinator(hass, entry)
-    async_add_entities(
+    entities: list[SensorEntity] = [
         AlexaMaSkillSensor(coordinator, entry, description) for description in SENSORS
-    )
+    ]
+    entities.append(AlexaMaSkillSetupChecklistSensor(coordinator, entry))
+    async_add_entities(entities)
 
 
 class AlexaMaSkillSensor(AlexaMaSkillEntity, SensorEntity):
@@ -168,3 +176,47 @@ class AlexaMaSkillSensor(AlexaMaSkillEntity, SensorEntity):
             if key in ("skill_status", "ma_api", "alexa_api"):
                 return None
         return self.entity_description.value_fn(data)
+
+
+class AlexaMaSkillSetupChecklistSensor(AlexaMaSkillEntity, SensorEntity):
+    """Setup checklist and Amazon console values."""
+
+    _attr_translation_key = "setup_checklist"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options: ClassVar[list[str]] = ["complete", "incomplete", "error"]
+    _attr_icon = "mdi:clipboard-check-outline"
+
+    def __init__(
+        self,
+        coordinator: AlexaMaSkillCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the setup checklist sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_setup_checklist"
+
+    @property
+    def native_value(self) -> str:
+        """Return complete, incomplete, or error."""
+        data = self.coordinator.data
+        if data is None or not self.coordinator.last_update_success:
+            return "error"
+        state, _attributes = build_setup_checklist(
+            entry_config(self._entry),
+            data,
+            self.coordinator.hass.config.language,
+        )
+        return state
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the checklist, console values, and next actions."""
+        data = self.coordinator.data
+        if data is None:
+            return {}
+        _state, attributes = build_setup_checklist(
+            entry_config(self._entry),
+            data,
+            self.coordinator.hass.config.language,
+        )
+        return attributes
