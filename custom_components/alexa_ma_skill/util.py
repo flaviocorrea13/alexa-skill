@@ -7,10 +7,17 @@ import re
 from html import unescape
 from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 from homeassistant.config_entries import ConfigEntry
 
+from .const import StatusLevel
+
 _PRE_RE = re.compile(r"<pre[^>]*>(.*?)</pre>", re.IGNORECASE | re.DOTALL)
+_STREAM_JSON_RE = re.compile(
+    r'("(?:streamUrl|audioSources)"\s*:\s*")[^"]*(")',
+    re.IGNORECASE,
+)
 
 
 def entry_config(entry: ConfigEntry) -> dict[str, Any]:
@@ -69,3 +76,43 @@ def parse_json_pre(value: str) -> dict[str, Any] | None:
     if not isinstance(data, dict):
         return None
     return data
+
+
+def redact_stream_urls(value: str) -> str:
+    """Redact stream URLs embedded in JSON-like status text."""
+    if not value:
+        return ""
+    return _STREAM_JSON_RE.sub(r"\1**REDACTED**\2", value)
+
+
+def skill_linked(skill_ask_html: str, level: StatusLevel) -> bool:
+    """Return True when the skill exists, matches, and testing is enabled."""
+    text = html_to_text(skill_ask_html).lower()
+    return (
+        level is StatusLevel.GREEN
+        and "endpoint matches" in text
+        and "testing enabled" in text
+    )
+
+
+def public_stream_url(value: str, ma_hostname: str) -> str | None:
+    """Rewrite a stream URL to its public HTTPS hostname."""
+    if not value:
+        return None
+    parsed = urlparse(value)
+    if not parsed.netloc:
+        return None
+    if ma_hostname:
+        return urlunparse(
+            (
+                "https",
+                ma_hostname,
+                parsed.path,
+                parsed.params,
+                parsed.query,
+                parsed.fragment,
+            )
+        )
+    if parsed.scheme == "https":
+        return value
+    return None

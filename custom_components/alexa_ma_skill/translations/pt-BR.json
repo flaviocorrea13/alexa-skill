@@ -152,5 +152,46 @@
       "addon_start_timeout": "O add-on não respondeu em até 90 segundos. Verifique os logs do add-on e tente novamente.",
       "ma_api_incomplete": "Informe MA_API_URL e MA_API_TOKEN juntos, ou deixe os dois em branco."
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "container_online": {
+        "name": "Contêiner online"
+      },
+      "https_skill": {
+        "name": "HTTPS da skill"
+      },
+      "https_stream": {
+        "name": "HTTPS do stream"
+      },
+      "skill_linked": {
+        "name": "Skill vinculada"
+      }
+    },
+    "sensor": {
+      "overall_status": {
+        "name": "Status geral",
+        "state": {
+          "ok": "OK",
+          "warning": "Atenção",
+          "error": "Erro"
+        }
+      },
+      "skill_status": {
+        "name": "Status da skill"
+      },
+      "ma_api": {
+        "name": "API do Music Assistant"
+      },
+      "alexa_api": {
+        "name": "API da Alexa"
+      },
+      "last_check": {
+        "name": "Última verificação"
+      },
+      "addon_version": {
+        "name": "Versão do add-on"
+      }
+    }
   }
 }

@@ -86,6 +86,16 @@ class AlexaMaSkillSupervisor:
         info = await self.async_get_info()
         return info.state is AddonState.RUNNING
 
+    async def async_get_running_and_version(
+        self,
+    ) -> tuple[bool, str | None]:
+        """Return whether the add-on is running and its version."""
+        self._require_manager()
+        from homeassistant.components.hassio import AddonState
+
+        info = await self.async_get_info()
+        return info.state is AddonState.RUNNING, info.version
+
     async def async_set_options(self, options: dict[str, Any]) -> None:
         """Merge options into the add-on configuration."""
         manager = self._require_manager()

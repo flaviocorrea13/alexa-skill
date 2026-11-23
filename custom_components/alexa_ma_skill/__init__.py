@@ -12,8 +12,10 @@ from .api import AlexaMaSkillApi
 from .const import (
     CONF_BASE_URL,
     CONF_IGNORE_HTTPS,
+    CONF_MA_HOSTNAME,
     CONF_PASSWORD,
     CONF_SCAN_INTERVAL,
+    CONF_SKILL_HOSTNAME,
     CONF_USERNAME,
     DEFAULT_BASE_URL,
     DEFAULT_SCAN_INTERVAL,
@@ -61,7 +63,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ignore_https=bool(config.get(CONF_IGNORE_HTTPS, False)),
     )
     supervisor = AlexaMaSkillSupervisor(hass)
-    coordinator = AlexaMaSkillCoordinator(hass, api, scan_interval=scan_interval)
+    coordinator = AlexaMaSkillCoordinator(
+        hass,
+        api,
+        supervisor=supervisor,
+        skill_hostname=str(config.get(CONF_SKILL_HOSTNAME) or ""),
+        ma_hostname=str(config.get(CONF_MA_HOSTNAME) or ""),
+        ignore_https=bool(config.get(CONF_IGNORE_HTTPS, False)),
+        scan_interval=scan_interval,
+    )
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = AlexaMaSkillRuntimeData(
