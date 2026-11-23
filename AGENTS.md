@@ -535,3 +535,40 @@ itens abaixo são fatos observados e não devem ser revertidos sem novo teste.
   `alexa-ma-skill` não deve ser usado no modo gerenciado.
 - Se nenhum add-on for encontrado, logar em `debug` a lista de slugs
   encontrados e mostrar a mensagem de add-on não instalado.
+
+### 12.8 Provider Alexa do Music Assistant
+
+- O provider **Alexa** do Music Assistant é quem envia o stream para o add-on
+  via `POST /ma/push-url`. A skill apenas lê o último `streamUrl`.
+- No provider, usar:
+  - `API URL`: base interna do add-on, `http://<IP_DO_HA>:5000`, **sem** `/ma`;
+  - `API Basic Auth Username`/`Password`: iguais a `APP_USERNAME`/`APP_PASSWORD`;
+  - `URL`: domínio Amazon da conta (`amazon.com`, `amazon.com.br` etc.);
+  - `OTP Secret`: vazio quando não há TOTP válido.
+- **Nunca** usar `https://SKILL_HOSTNAME` como `API URL`: `/ma` é bloqueado
+  publicamente pelo WAF. O provider precisa falar com o add-on pela rede local.
+- Se o MA estiver em outro contêiner, `http://localhost:5000` aponta para o
+  próprio MA; usar o IP do HA ou o hostname interno derivado do slug.
+- Teste obrigatório:
+  ```sh
+  curl -i -u "$APP_USERNAME:$APP_PASSWORD" \
+    "http://<IP_DO_HA>:5000/ma/latest-url"
+  ```
+  - `200` com `streamUrl`: push OK;
+  - `404 No URL available`: auth OK, mas o MA ainda não enviou stream;
+  - `401`: credenciais erradas no provider/`curl`;
+  - erro de conexão: IP/porta/rede errados.
+- O add-on guarda o último stream em memória (`shared_store`). Reiniciar o
+  add-on apaga esse valor. Depois de reiniciar, tocar algo pelo MA antes de
+  invocar a Alexa.
+- Sintomas:
+  - `could not retrieve the latest music stream from the API`: sem `streamUrl`;
+  - `can't reach the audio file`: add-on não validou a URL pública; testar do
+    host e de dentro do contêiner e, se for hairpin NAT, usar
+    `SKIP_URL_VALIDATION: true`;
+  - `Play action failed` / `This action is currently unavailable`: o provider
+    não conseguiu enviar o stream/comando; conferir URL interna, porta `5000`,
+    Basic Auth, sessão Amazon, Echo online e skill habilitada.
+- Erro real observado: `API URL` com um dígito errado na porta `5000` fazia o
+  provider falhar silenciosamente; o `curl /ma/latest-url` retornava `404`.
+- Não registrar credenciais reais em documentação, logs ou commits.

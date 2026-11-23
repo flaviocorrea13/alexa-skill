@@ -188,6 +188,14 @@ Se preferir não usar SSH, defina `APP_USERNAME` e `APP_PASSWORD` você mesmo
 nas opções do add-on antes do primeiro início. Não use credenciais padrão como
 `admin`/`teste`.
 
+As mesmas credenciais protegem `/ma` e devem ser usadas no provider Alexa do
+Music Assistant:
+
+- `API Basic Auth Username` = `APP_USERNAME`
+- `API Basic Auth Password` = `APP_PASSWORD`
+
+Ao trocar a senha, atualize também o provider no MA.
+
 Para trocar as credenciais depois:
 
 1. Preencha `APP_USERNAME` e `APP_PASSWORD` com os novos valores.
@@ -368,6 +376,7 @@ autenticação.
 
 | Serviço | Porta padrão | Uso |
 |---|---:|---|
+| Add-on / provider Alexa do MA | `5000` | `/ma/push-url`, `/setup`, `/status` |
 | Stream do Music Assistant | `8097` | Áudio enviado à Alexa (`MA_HOSTNAME`) |
 | API WebSocket do Music Assistant | `8095` | Comandos de controle (`MA_API_URL`) |
 
@@ -382,6 +391,116 @@ Para associar cada Echo ao player correto do Music Assistant, abra
 Próxima/anterior e início da faixa dependem do Music Assistant para escolher o
 conteúdo. Pausar, parar e continuar controlam o player Alexa diretamente e
 também são sincronizados com o Music Assistant quando há um player associado.
+
+## Provider Alexa do Music Assistant
+
+A Alexa não busca o stream diretamente no Music Assistant. O provider **Alexa**
+do MA envia a URL do stream para o add-on via `POST /ma/push-url`. Depois a
+skill lê essa URL e responde com `AudioPlayer.Play`.
+
+No Music Assistant, em **Settings > Providers > Alexa**, configure:
+
+| Campo | Valor |
+|---|---|
+| `URL` | Domínio Amazon da conta: `amazon.com`, `amazon.com.br` etc. |
+| `E-mail` | Conta Amazon usada pelos Echos. |
+| `Senha` | Senha da conta Amazon. |
+| `OTP Secret` | Vazio se não houver uma chave TOTP válida. |
+| `API URL` | `http://<IP_DO_HOME_ASSISTANT>:5000` |
+| `API Basic Auth Username` | `APP_USERNAME` do add-on. |
+| `API Basic Auth Password` | `APP_PASSWORD` do add-on. |
+
+Regras importantes:
+
+- Use a URL **interna** do add-on, por exemplo
+  `http://192.168.1.10:5000`.
+- Não use `https://SKILL_HOSTNAME` como `API URL`. O caminho `/ma` é bloqueado
+  publicamente pelo WAF e não deve ser exposto.
+- Não use `http://localhost:5000` se o Music Assistant estiver em outro
+  contêiner/add-on; nesse caso, `localhost` aponta para o próprio contêiner do
+  MA.
+- O `API URL` é a base, **sem** `/ma`. O provider acrescenta `/ma/push-url`.
+- Se você trocar `APP_USERNAME`/`APP_PASSWORD` no add-on, atualize também o
+  provider Alexa do MA.
+- O `OTP Secret` só deve ser preenchido quando existe uma chave TOTP válida.
+
+### Teste do stream no add-on
+
+Use as credenciais do painel:
+
+```sh
+APP_USERNAME='<APP_USERNAME>'
+APP_PASSWORD='<APP_PASSWORD>'
+
+curl -i -u "$APP_USERNAME:$APP_PASSWORD" \
+  "http://<IP_DO_HOME_ASSISTANT>:5000/ma/latest-url"
+```
+
+Interpretação:
+
+| Resposta | Significado |
+|---|---|
+| `200` com `streamUrl` | O MA enviou o stream e o add-on tem uma URL. |
+| `404 {"error":"No URL available"}` | Autenticação OK, mas o MA ainda não enviou stream. |
+| `401 Unauthorized` | `APP_USERNAME`/`APP_PASSWORD` errados no provider ou no `curl`. |
+| Erro de conexão | `API URL` inacessível a partir do MA; confira IP, porta `5000` e rede. |
+
+Para testar o push manualmente:
+
+```sh
+curl -i -u "$APP_USERNAME:$APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"streamUrl":"https://example.com/test.mp3","title":"teste"}' \
+  "http://<IP_DO_HOME_ASSISTANT>:5000/ma/push-url"
+```
+
+Esperado: `200` com `{"status":"ok"}`. Isso grava uma URL falsa apenas para
+teste; o próximo play real do MA sobrescreve o valor.
+
+### Depois de reiniciar o add-on
+
+O add-on guarda o último stream em memória. Quando ele reinicia, esse valor é
+perdido. A ordem correta é:
+
+1. Reiniciar o add-on.
+2. No Music Assistant, tocar algo no player do Echo.
+3. O MA envia um novo `POST /ma/push-url`.
+4. Conferir o `200` em `/ma/latest-url`.
+5. Invocar a Alexa.
+
+Se você invocar a Alexa antes do passo 2, a skill pode responder que não
+conseguiu obter o stream.
+
+### `Play action failed` no Music Assistant
+
+Esse aviso é do provider Alexa do MA, não do add-on. Ele indica que o provider
+não conseguiu enviar o stream ou o comando para o Echo.
+
+Verifique:
+
+- `API URL` interno, com a porta `5000` correta;
+- `API Basic Auth Username`/`Password` iguais aos do add-on;
+- provider autenticado na conta Amazon;
+- Echo online e na mesma conta;
+- skill habilitada em **Skills > Suas Skills > Dev**;
+- logs do MA em busca de `/ma/push-url`, `401`, `Failed API request` ou
+  `ActionUnavailable`.
+
+### Domínio da conta Amazon
+
+O aviso:
+
+```text
+amazon.com.br does not match account domain amazon.com
+```
+
+pode ser ignorado se o áudio tocar. Se o login, o `Play action failed` ou o
+comando para o Echo continuarem falhando, tente o domínio correto da conta:
+
+- conta brasileira: `amazon.com.br`;
+- conta americana: `amazon.com`.
+
+Depois de alterar o domínio, reautentique o provider e conclua o 2FA.
 
 ## Diagnóstico
 
@@ -487,15 +606,57 @@ Não faça chamadas públicas a `/status`.
   logs.
 - Use `/status` (recent invocations) ou `/invocations` como indicador.
 
+### A Alexa responde "could not retrieve the latest music stream from the API"
+
+- O add-on está sem `streamUrl`.
+- O provider Alexa do Music Assistant não enviou `POST /ma/push-url`.
+- Confira o `API URL` do provider: `http://<IP_DO_HOME_ASSISTANT>:5000`, sem
+  `/ma`, e com a porta `5000` correta.
+- Confira `API Basic Auth Username` e `API Basic Auth Password`.
+- Teste:
+  ```sh
+  curl -i -u "$APP_USERNAME:$APP_PASSWORD" \
+    "http://<IP_DO_HOME_ASSISTANT>:5000/ma/latest-url"
+  ```
+- Se retornar `404 No URL available`, toque algo pelo Music Assistant e teste
+  novamente.
+- Se o add-on reiniciou, o stream em memória foi perdido; toque algo no MA
+  novamente antes de invocar a Alexa.
+- Veja os logs do MA em busca de `/ma/push-url`, `401` ou
+  `Failed API request`.
+
+### A Alexa responde "can't reach the audio file"
+
+- O add-on encontrou um `streamUrl`, mas não conseguiu validar a URL pública.
+- Teste a URL no host:
+  ```sh
+  curl -I 'https://stream.exemplo.com/...'
+  ```
+- Teste de dentro do add-on:
+  ```sh
+  docker exec addon_<slug> \
+    python -c "import requests; r=requests.head('<URL>', allow_redirects=True, timeout=5); print(r.status_code)"
+  ```
+- Se o host funciona e o contêiner falha, é hairpin NAT/DNS interno. Ative
+  `SKIP_URL_VALIDATION: true` nas opções do add-on, reinicie e teste.
+- Se ambos falham, confira:
+  - rota de `MA_HOSTNAME` apontando para a porta `8097` do Music Assistant;
+  - ordem das rotas no Cloudflare;
+  - certificado válido;
+  - acesso à URL fora da rede local.
+
 ### O áudio não toca
 
 - Confirme que `MA_HOSTNAME` está correto e que o túnel aponta para a porta
   `8097` do Music Assistant.
 - Confirme que o certificado de `MA_HOSTNAME` é válido.
 - Confirme que o player do Music Assistant está ativo.
+- Confirme que o provider Alexa do MA está configurado com a URL interna e as
+  credenciais do add-on.
 - Se o add-on não consegue alcançar o hostname público, ative
   `SKIP_URL_VALIDATION` temporariamente.
-- Verifique `/status`.
+- Verifique `/status` e as invocações recentes.
+- Veja também [Provider Alexa do Music Assistant](#provider-alexa-do-music-assistant).
 
 ### Próxima/anterior não funcionam
 

@@ -118,6 +118,23 @@ A documentação completa está em
   `Skill ID Verification failed!!` e a Alexa responde "problema com a resposta
   da skill". A integração lê o ID nos logs de `/setup` e avisa quando vazio ou
   divergente, sugerindo o valor correto. O ID aparece como `Done. Skill ID:`.
+- **Provider Alexa do Music Assistant:** configure `API URL` com a URL **interna**
+  do add-on, por exemplo `http://<IP_DO_HA>:5000`, e `API Basic Auth
+  Username`/`Password` iguais a `APP_USERNAME`/`APP_PASSWORD`. Não use
+  `https://SKILL_HOSTNAME`; o caminho `/ma` é bloqueado publicamente.
+- **Não confunda as portas:** `API URL` do provider Alexa = `5000` (add-on);
+  `MA_API_URL` = `8095` (API WebSocket do MA); stream em `MA_HOSTNAME` = `8097`.
+- **"could not retrieve the latest music stream from the API":** o add-on está
+  sem `streamUrl`. Teste
+  `curl -u "$APP_USERNAME:$APP_PASSWORD" http://<IP_DO_HA>:5000/ma/latest-url`.
+  Se der `404 No URL available`, o MA não enviou o stream. Depois de reiniciar
+  o add-on, toque algo pelo MA antes de invocar a Alexa.
+- **"can't reach the audio file":** o add-on não conseguiu validar a URL
+  pública. Teste a URL no host e dentro do add-on. Se só o contêiner falhar,
+  ative `SKIP_URL_VALIDATION: true` temporariamente.
+- **`Play action failed` no Music Assistant:** confira a URL interna do
+  provider, a porta `5000`, as credenciais Basic Auth, a sessão Amazon e se o
+  Echo está online.
 - **Cloudflare/Traefik retorna `404 page not found` em texto puro:** as rotas
   específicas de `SKILL_HOSTNAME` e `MA_HOSTNAME` devem vir **antes** das rotas
   curinga (`*.dominio`). Deixe a curinga/catch-all por último.
