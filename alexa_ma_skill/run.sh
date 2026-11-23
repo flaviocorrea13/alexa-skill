@@ -13,17 +13,31 @@ mkdir -p /data/ask
 chmod 700 /data/ask
 
 if [ -L /root/.ask ]; then
-    current_target="$(readlink /root/.ask || true)"
+    current_target="$(readlink -f /root/.ask || true)"
     if [ "$current_target" != "/data/ask" ]; then
+        # A symlink to another legacy directory may still hold the only copy
+        # of the credentials. Migrate it before replacing the symlink.
+        if [ -n "$current_target" ] && [ -d "$current_target" ]; then
+            if ! cp -an "$current_target"/. /data/ask/; then
+                echo "ERROR: could not migrate legacy ASK credentials from $current_target; leaving /root/.ask untouched." >&2
+                exit 1
+            fi
+        fi
         rm -f /root/.ask
         ln -s /data/ask /root/.ask
     fi
 elif [ -d /root/.ask ]; then
     # Preserve credentials created before the symlink existed without
-    # overwriting the persistent copy in /data/ask.
-    cp -an /root/.ask/. /data/ask/ 2>/dev/null || true
-    rm -rf /root/.ask
-    ln -s /data/ask /root/.ask
+    # overwriting the persistent copy in /data/ask. If the migration fails,
+    # stop and leave the legacy directory untouched instead of deleting the
+    # only copy.
+    if cp -an /root/.ask/. /data/ask/; then
+        rm -rf /root/.ask
+        ln -s /data/ask /root/.ask
+    else
+        echo "ERROR: could not migrate legacy /root/.ask to /data/ask; leaving the legacy directory in place." >&2
+        exit 1
+    fi
 elif [ -e /root/.ask ]; then
     rm -f /root/.ask
     ln -s /data/ask /root/.ask

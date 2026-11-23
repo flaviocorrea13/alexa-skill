@@ -66,6 +66,7 @@ from .const import (
     MIN_SCAN_INTERVAL,
     NAME,
 )
+from .setup import build_setup_checklist
 from .supervisor import (
     AddonCandidate,
     AlexaMaSkillSupervisor,
@@ -92,6 +93,17 @@ class _FlowError(Exception):
         self.placeholders = dict(placeholders or {})
 
 
+def _safe_input(value: Any) -> str:
+    """Return a short, credential-free representation for form errors."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "@" in text:
+        host = text.rsplit("@", 1)[1]
+        return f"***@{host[:120]}"
+    return text[:120]
+
+
 def _clean_hostname(value: Any, *, required: bool = True) -> str:
     """Validate and normalize a bare hostname."""
     text = str(value or "").strip()
@@ -100,16 +112,16 @@ def _clean_hostname(value: Any, *, required: bool = True) -> str:
             raise _FlowError("invalid_hostname", {"host": ""})
         return ""
     if "://" in text:
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     text = text.rstrip(".")
     if not text:
         raise _FlowError("invalid_hostname", {"host": ""})
     if any(character in text for character in "/?#@\\ \t\r\n"):
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     if ":" in text:
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     if len(text) > 253:
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     return text
 
 
@@ -118,11 +130,11 @@ def _clean_base_url(value: Any) -> str:
     text = str(value or "").strip()
     parsed = urlparse(text)
     if parsed.scheme not in ("http", "https"):
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     if not parsed.netloc or parsed.username or parsed.password:
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     if parsed.path not in ("", "/") or parsed.params or parsed.query or parsed.fragment:
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
@@ -132,23 +144,64 @@ def _clean_ma_api_url(value: Any) -> str:
     if not text:
         return ""
     if any(character in text for character in " \t\r\n"):
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     parsed = urlparse(text)
     if parsed.scheme not in ("http", "https", "ws", "wss") or not parsed.netloc:
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     if parsed.username or parsed.password:
-        raise _FlowError("invalid_hostname", {"host": text})
+        raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     return text
 
 
 def _validate_ma_api_pair(url: str, token: str, current_token: str = "") -> str:
-    """Require MA_API_URL and MA_API_TOKEN to be provided together."""
-    token = token.strip()
-    current_token = current_token.strip()
-    effective_token = token or (current_token if url else "")
-    if bool(url) != bool(effective_token):
-        raise _FlowError("ma_api_incomplete")
-    return effective_token
+    """Return the token to preserve, allowing MA_API_URL without a token."""
+    token = "" if _is_masked(token) else token.strip()
+    current_token = "" if _is_masked(current_token) else current_token.strip()
+    if not url:
+        if token:
+            raise _FlowError("ma_api_incomplete")
+        return ""
+    return token or current_token
+
+
+def _is_masked(value: object) -> bool:
+    """Return True for masked placeholder values such as ********."""
+    text = str(value or "")
+    return bool(text) and len(text) >= 3 and set(text) == {"*"}
+
+
+def _preserve_password(
+    user_value: object, addon_value: object, entry_value: object
+) -> str:
+    """Preserve a panel password without using a secret file path for auth."""
+    text = str(user_value or "")
+    if text and not _is_masked(text):
+        return text
+    addon_text = str(addon_value or "")
+    if addon_text and not _is_masked(addon_text) and not addon_text.startswith("/"):
+        return addon_text
+    entry_text = str(entry_value or "")
+    return "" if _is_masked(entry_text) else entry_text
+
+
+def _preserve_token(
+    user_value: object,
+    addon_value: object,
+    entry_value: object,
+    *,
+    has_url: bool,
+) -> str:
+    """Preserve an MA token when the user did not enter a new one."""
+    text = str(user_value or "").strip()
+    if text and not _is_masked(text):
+        return text
+    if not has_url:
+        return ""
+    addon_text = str(addon_value or "").strip()
+    if addon_text and not _is_masked(addon_text):
+        return addon_text
+    entry_text = str(entry_value or "").strip()
+    return "" if _is_masked(entry_text) else entry_text
 
 
 def _generate_credentials() -> tuple[str, str]:
@@ -159,11 +212,28 @@ def _generate_credentials() -> tuple[str, str]:
     )
 
 
+BOOL_OPTION_KEYS = {
+    "ENABLE_APL",
+    "SKIP_URL_VALIDATION",
+    CONF_ENABLE_APL,
+    CONF_SKIP_URL_VALIDATION,
+}
+
+
+def _normalise_bool_option(value: Any) -> bool:
+    """Return a boolean for Supervisor option values."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
 def _option_matches(options: Mapping[str, Any], key: str, value: Any) -> bool:
     """Compare an add-on option with the value we tried to write."""
     current = options.get(key)
-    if key in (CONF_ENABLE_APL, CONF_SKIP_URL_VALIDATION):
-        return bool(current) == bool(value)
+    if key in BOOL_OPTION_KEYS:
+        return _normalise_bool_option(current) == _normalise_bool_option(value)
     if key == "PORT":
         return str(current) == str(value)
     return str(current or "") == str(value or "")
@@ -179,7 +249,11 @@ def _validate_addon_options(
 
 
 async def _async_check_https(
-    hass: HomeAssistant, host: str, ignore_https: bool
+    hass: HomeAssistant,
+    host: str,
+    ignore_https: bool,
+    *,
+    expect_skill: bool = False,
 ) -> None:
     """Check that the public HTTPS endpoint is reachable."""
     url = f"https://{host}/"
@@ -191,7 +265,10 @@ async def _async_check_https(
         kwargs["ssl"] = False
     try:
         async with async_get_clientsession(hass).get(url, **kwargs) as response:
-            if response.status >= 500:
+            if expect_skill:
+                if response.status not in (200, 401, 403):
+                    raise _FlowError("https_unreachable", {"host": host})
+            elif response.status >= 500:
                 raise _FlowError("https_unreachable", {"host": host})
             return
     except (aiohttp.ClientError, TimeoutError, OSError) as err:
@@ -212,6 +289,45 @@ async def _async_wait_for_status(api: AlexaMaSkillApi) -> None:
             if loop.time() >= deadline:
                 raise _FlowError("addon_start_timeout") from err
             await asyncio.sleep(ADDON_START_POLL_INTERVAL)
+
+
+def _notify_options_issue(hass: HomeAssistant, message: str) -> None:
+    """Show a non-secret notification about a partial options update."""
+    try:
+        from homeassistant.components import persistent_notification
+
+        persistent_notification.async_create(
+            hass,
+            message,
+            "Alexa MA Skill",
+        )
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning(
+            "Could not create the options notification: %s", type(err).__name__
+        )
+
+
+def _options_issue_message(hass: HomeAssistant, *, restart_failed: bool) -> str:
+    """Return a localized message for a skipped or failed restart."""
+    if str(hass.config.language).lower().startswith("pt"):
+        if restart_failed:
+            return (
+                "As opções foram salvas, mas o reinício do add-on falhou. "
+                "Reinicie o add-on manualmente e verifique os logs."
+            )
+        return (
+            "As opções foram salvas. O reinício do add-on foi cancelado; "
+            "reinicie manualmente para aplicar."
+        )
+    if restart_failed:
+        return (
+            "The options were saved, but the add-on restart failed. Restart "
+            "the add-on manually and check the logs."
+        )
+    return (
+        "The options were saved. The add-on restart was skipped; restart it "
+        "manually to apply the changes."
+    )
 
 
 def _locale_selector() -> SelectSelector:
@@ -316,7 +432,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_SKILL_HOSTNAME,
                     default=defaults.get(CONF_SKILL_HOSTNAME, ""),
                 ): TextSelector(),
-                vol.Required(
+                vol.Optional(
                     CONF_MA_HOSTNAME,
                     default=defaults.get(CONF_MA_HOSTNAME, ""),
                 ): TextSelector(),
@@ -373,7 +489,9 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         try:
             skill_hostname = _clean_hostname(user_input.get(CONF_SKILL_HOSTNAME))
-            ma_hostname = _clean_hostname(user_input.get(CONF_MA_HOSTNAME))
+            ma_hostname = _clean_hostname(
+                user_input.get(CONF_MA_HOSTNAME), required=False
+            )
             ma_api_url = _clean_ma_api_url(user_input.get(CONF_MA_API_URL, ""))
             ma_api_token = _validate_ma_api_pair(
                 ma_api_url, str(user_input.get(CONF_MA_API_TOKEN) or "")
@@ -398,7 +516,26 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 raise _FlowError("cannot_connect") from err
 
             existing_skill_id = str(info.options.get("SKILL_ID") or "").strip()
-            username, password = _generate_credentials()
+            existing_ma_api_url = str(info.options.get("MA_API_URL") or "").strip()
+            existing_ma_api_token = str(info.options.get("MA_API_TOKEN") or "")
+            if not ma_api_url:
+                ma_api_url = existing_ma_api_url
+            if ma_api_url and not ma_api_token:
+                ma_api_token = existing_ma_api_token
+
+            existing_username = str(info.options.get("APP_USERNAME") or "").strip()
+            existing_password = str(info.options.get("APP_PASSWORD") or "")
+            reuse_credentials = bool(
+                existing_username
+                and existing_password
+                and not existing_username.startswith("/")
+                and not existing_password.startswith("/")
+            )
+            if reuse_credentials:
+                username, password = existing_username, existing_password
+            else:
+                username, password = _generate_credentials()
+
             addon_options = {
                 "SKILL_HOSTNAME": skill_hostname,
                 "MA_HOSTNAME": ma_hostname,
@@ -437,8 +574,11 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await _async_wait_for_status(api)
 
             # The public endpoint can only be tested after the add-on is running.
-            await _async_check_https(self.hass, skill_hostname, ignore_https)
-            await _async_check_https(self.hass, ma_hostname, ignore_https)
+            await _async_check_https(
+                self.hass, skill_hostname, ignore_https, expect_skill=True
+            )
+            if ma_hostname:
+                await _async_check_https(self.hass, ma_hostname, ignore_https)
 
             self._pending_data = {
                 CONF_MANAGED: True,
@@ -457,6 +597,11 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
                 CONF_IGNORE_HTTPS: ignore_https,
             }
+            if reuse_credentials:
+                return self.async_create_entry(
+                    title=f"{NAME} ({skill_hostname})",
+                    data=self._pending_data,
+                )
             return await self.async_step_credentials()
         except _FlowError as err:
             return self.async_show_form(
@@ -525,7 +670,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_SKILL_HOSTNAME,
                     default=defaults.get(CONF_SKILL_HOSTNAME, ""),
                 ): TextSelector(),
-                vol.Required(
+                vol.Optional(
                     CONF_MA_HOSTNAME,
                     default=defaults.get(CONF_MA_HOSTNAME, ""),
                 ): TextSelector(),
@@ -571,7 +716,9 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not username or not password:
                 raise _FlowError("invalid_auth")
             skill_hostname = _clean_hostname(user_input.get(CONF_SKILL_HOSTNAME))
-            ma_hostname = _clean_hostname(user_input.get(CONF_MA_HOSTNAME))
+            ma_hostname = _clean_hostname(
+                user_input.get(CONF_MA_HOSTNAME), required=False
+            )
             ma_api_url = _clean_ma_api_url(user_input.get(CONF_MA_API_URL, ""))
             ma_api_token = _validate_ma_api_pair(
                 ma_api_url, str(user_input.get(CONF_MA_API_TOKEN) or "")
@@ -887,10 +1034,23 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        """Show the integration menu."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["settings", "setup"],
+        )
+
+    async def async_step_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
         """Edit the integration and add-on settings."""
         entry = self.config_entry
         config = entry_config(entry)
         managed = bool(config.get(CONF_MANAGED, False))
+        self._pending_config: dict[str, Any] | None = None
+        self._pending_supervisor: AlexaMaSkillSupervisor | None = None
+        self._pending_api: AlexaMaSkillApi | None = None
+        self._pending_changes: list[str] = []
         suggested_skill_id = ""
         runtime = self.hass.data.get(DOMAIN, {}).get(entry.entry_id)
         if runtime is not None and runtime.coordinator.data is not None:
@@ -908,11 +1068,13 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
             selected_addon_slug=selected_addon_slug,
         )
         if user_input is None:
-            return self.async_show_form(step_id="init", data_schema=schema)
+            return self.async_show_form(step_id="settings", data_schema=schema)
 
         try:
             skill_hostname = _clean_hostname(user_input.get(CONF_SKILL_HOSTNAME))
-            ma_hostname = _clean_hostname(user_input.get(CONF_MA_HOSTNAME))
+            ma_hostname = _clean_hostname(
+                user_input.get(CONF_MA_HOSTNAME), required=False
+            )
             username = str(
                 user_input.get(CONF_USERNAME) or config.get(CONF_USERNAME) or ""
             ).strip()
@@ -974,6 +1136,7 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                 else str(config.get(CONF_BASE_URL) or DEFAULT_BASE_URL)
             )
 
+            addon_changes: dict[str, Any] = {}
             if managed:
                 supervisor = AlexaMaSkillSupervisor(self.hass)
                 try:
@@ -989,6 +1152,25 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                     SupervisorUnavailableError,
                 ) as err:
                     raise _FlowError("cannot_connect") from err
+
+                # Preserve raw secrets that the user did not change. If the
+                # add-on stores a file path, keep the integration's stored
+                # password for HTTP basic auth instead of using the path.
+                password = _preserve_password(
+                    user_input.get(CONF_PASSWORD),
+                    info.options.get("APP_PASSWORD"),
+                    config.get(CONF_PASSWORD),
+                )
+                if (
+                    ma_api_url
+                    and not str(user_input.get(CONF_MA_API_TOKEN) or "").strip()
+                ):
+                    ma_api_token = _preserve_token(
+                        "",
+                        info.options.get("MA_API_TOKEN"),
+                        config.get(CONF_MA_API_TOKEN),
+                        has_url=True,
+                    )
 
                 base_url = (
                     f"http://{info.hostname or addon_hostname(addon_slug)}"
@@ -1012,6 +1194,13 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                     for key, value in addon_options.items()
                     if not _option_matches(info.options, key, value)
                 }
+                api = AlexaMaSkillApi(
+                    self.hass,
+                    base_url,
+                    username,
+                    password,
+                    ignore_https=ignore_https,
+                )
                 if addon_changes:
                     try:
                         await supervisor.async_set_options(addon_options)
@@ -1022,29 +1211,7 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                     ) as err:
                         raise _FlowError("addon_options_invalid") from err
                     _validate_addon_options(updated_info.options, addon_options)
-                    try:
-                        await supervisor.async_start_or_restart()
-                    except (
-                        SupervisorOperationError,
-                        SupervisorUnavailableError,
-                    ) as err:
-                        raise _FlowError("cannot_connect") from err
-                    api = AlexaMaSkillApi(
-                        self.hass,
-                        base_url,
-                        username,
-                        password,
-                        ignore_https=ignore_https,
-                    )
-                    await _async_wait_for_status(api)
                 else:
-                    api = AlexaMaSkillApi(
-                        self.hass,
-                        base_url,
-                        username,
-                        password,
-                        ignore_https=ignore_https,
-                    )
                     try:
                         await api.async_get_status()
                     except AlexaMaSkillAuthError as err:
@@ -1083,10 +1250,24 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                 CONF_SCAN_INTERVAL: scan_interval,
                 CONF_IGNORE_HTTPS: ignore_https,
             }
+            runtime = self.hass.data.get(DOMAIN, {}).get(entry.entry_id)
+            if runtime is not None:
+                changed_keys = set(addon_changes)
+                changed_keys.update(
+                    key for key, value in new_config.items() if config.get(key) != value
+                )
+                if changed_keys:
+                    await runtime.checklist.async_clear_for_keys(changed_keys)
+            if managed and addon_changes:
+                self._pending_config = new_config
+                self._pending_supervisor = supervisor
+                self._pending_api = api
+                self._pending_changes = list(addon_changes)
+                return await self.async_step_restart_confirm()
             return self.async_create_entry(title="", data=new_config)
         except _FlowError as err:
             return self.async_show_form(
-                step_id="init",
+                step_id="settings",
                 data_schema=schema,
                 errors={"base": err.error},
                 description_placeholders=err.placeholders,
@@ -1097,10 +1278,150 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                 type(err).__name__,
             )
             return self.async_show_form(
-                step_id="init",
+                step_id="settings",
                 data_schema=schema,
                 errors={"base": "cannot_connect"},
             )
+
+    async def async_step_setup(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Show the assisted setup progress and manual confirmations."""
+        runtime = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        if runtime is None:
+            return self.async_abort(reason="not_loaded")
+
+        try:
+            await runtime.coordinator.async_request_refresh()
+        except Exception as err:  # noqa: BLE001 - show the checklist regardless
+            _LOGGER.debug(
+                "Checklist refresh failed, using the last known data: %s",
+                type(err).__name__,
+            )
+        config = entry_config(self.config_entry)
+        _state, attrs = build_setup_checklist(
+            config,
+            runtime.coordinator.data,
+            self.hass.config.language,
+            runtime.checklist.confirmations,
+        )
+
+        if user_input is not None:
+            status_by_id = {step["id"]: step["status"] for step in attrs["checklist"]}
+            # Clear unchecked steps first so a dependent cannot be re-added in
+            # the same submission after its prerequisite is unchecked.
+            for step in attrs["manual_steps"]:
+                if not bool(user_input.get(step["id"])):
+                    await runtime.checklist.async_set(step["id"], False)
+            for step in attrs["manual_steps"]:
+                if bool(user_input.get(step["id"])) and all(
+                    status_by_id.get(dependency) in ("done", "not_applicable")
+                    for dependency in step["dependencies"]
+                ):
+                    await runtime.checklist.async_set(step["id"], True)
+            try:
+                await runtime.coordinator.async_request_refresh()
+            except Exception as err:  # noqa: BLE001 - keep the checklist usable
+                _LOGGER.debug(
+                    "Checklist refresh after saving failed: %s",
+                    type(err).__name__,
+                )
+            if user_input.get("back_to_menu"):
+                return await self.async_step_init()
+            _state, attrs = build_setup_checklist(
+                config,
+                runtime.coordinator.data,
+                self.hass.config.language,
+                runtime.checklist.confirmations,
+            )
+
+        fields: dict[Any, Any] = {}
+        for step in attrs["manual_steps"]:
+            fields[vol.Optional(step["id"], default=step["confirmed"])] = (
+                BooleanSelector()
+            )
+        fields[vol.Optional("back_to_menu", default=False)] = BooleanSelector()
+
+        summary = "\n".join(
+            f"[{'x' if step['done'] else ' '}] {step['title']} — {step['status_label']}"
+            for step in attrs["checklist"]
+        )
+        details = "\n".join(
+            f"{step['title']}: {step['result']}. {step['how_to_fix']}"
+            for step in attrs["checklist"]
+            if step["status"] in ("pending", "attention", "blocked")
+        )
+        progress = attrs["progress"]
+        return self.async_show_form(
+            step_id="setup",
+            data_schema=vol.Schema(fields),
+            description_placeholders={
+                "progress": (
+                    f"{progress['done']}/{progress['applicable']} "
+                    f"({progress['percent']}%)"
+                ),
+                "next_step": progress.get("next_step_title") or "-",
+                "summary": summary,
+                "details": details or "-",
+                "local_setup_url": attrs["local_setup_url"],
+                "provider_api_url": attrs["provider_api_url"],
+                "duplicate_warning": attrs["duplicate_warning"],
+            },
+        )
+
+    async def async_step_restart_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask before restarting the add-on after saving options."""
+        pending_config = getattr(self, "_pending_config", None)
+        pending_supervisor = getattr(self, "_pending_supervisor", None)
+        if pending_config is None or pending_supervisor is None:
+            return await self.async_step_settings()
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="restart_confirm",
+                data_schema=vol.Schema(
+                    {vol.Required(_CONFIRM_KEY, default=True): BooleanSelector()}
+                ),
+                description_placeholders={
+                    "changes": ", ".join(getattr(self, "_pending_changes", []))
+                },
+            )
+
+        if bool(user_input.get(_CONFIRM_KEY, True)):
+            try:
+                await pending_supervisor.async_start_or_restart()
+                pending_api = getattr(self, "_pending_api", None)
+                if pending_api is not None:
+                    await _async_wait_for_status(pending_api)
+            except (
+                SupervisorOperationError,
+                SupervisorUnavailableError,
+                _FlowError,
+            ) as err:
+                _LOGGER.warning(
+                    "Options saved, but add-on restart failed: %s",
+                    type(err).__name__,
+                )
+                _notify_options_issue(
+                    self.hass,
+                    _options_issue_message(self.hass, restart_failed=True),
+                )
+            else:
+                _LOGGER.info("Add-on restarted after options update")
+        else:
+            _LOGGER.info("Options saved; add-on restart skipped by user")
+            _notify_options_issue(
+                self.hass,
+                _options_issue_message(self.hass, restart_failed=False),
+            )
+
+        self._pending_config = None
+        self._pending_supervisor = None
+        self._pending_api = None
+        self._pending_changes = []
+        return self.async_create_entry(title="", data=pending_config)
 
     def _options_schema(
         self,
@@ -1134,7 +1455,7 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                     CONF_SKILL_HOSTNAME, config.get(CONF_SKILL_HOSTNAME, "")
                 ),
             ): TextSelector(),
-            vol.Required(
+            vol.Optional(
                 CONF_MA_HOSTNAME,
                 default=defaults.get(
                     CONF_MA_HOSTNAME, config.get(CONF_MA_HOSTNAME, "")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -32,6 +33,7 @@ from .const import (
     STORAGE_VERSION,
 )
 from .coordinator import AlexaMaSkillCoordinator
+from .setup import ChecklistManager
 from .supervisor import (
     AlexaMaSkillSupervisor,
     SupervisorOperationError,
@@ -50,6 +52,7 @@ class AlexaMaSkillRuntimeData:
     api: AlexaMaSkillApi
     coordinator: AlexaMaSkillCoordinator
     supervisor: AlexaMaSkillSupervisor
+    checklist: ChecklistManager
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -134,6 +137,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         stored_skill_id = stored.get("detected_skill_id")
         if isinstance(stored_skill_id, str) and stored_skill_id:
             detected_skill_id = stored_skill_id
+    checklist_store: Store[dict[str, Any]] = Store(
+        hass,
+        STORAGE_VERSION,
+        f"{DOMAIN}.{entry.entry_id}.checklist",
+    )
+    checklist = ChecklistManager(checklist_store, await checklist_store.async_load())
+    if addon_slug and str(config.get(CONF_ADDON_SLUG) or "") != addon_slug:
+        await checklist.async_clear_all()
     coordinator = AlexaMaSkillCoordinator(
         hass,
         api,
@@ -152,6 +163,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         api=api,
         coordinator=coordinator,
         supervisor=supervisor,
+        checklist=checklist,
     )
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -161,8 +173,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
+        if runtime is not None:
+            await runtime.coordinator.async_shutdown()
         domain_data = hass.data.get(DOMAIN, {})
         domain_data.pop(entry.entry_id, None)
         if not domain_data:

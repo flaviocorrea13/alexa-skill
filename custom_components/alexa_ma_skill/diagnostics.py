@@ -88,6 +88,8 @@ def _coordinator_data(data: AlexaMaSkillData | None) -> dict[str, Any] | None:
         "last_check": data.last_check.isoformat() if data.last_check else None,
         "detailed_error": data.detailed_error,
         "container_online": data.container_online,
+        "addon_installed": data.addon_installed,
+        "addon_hostname": data.addon_hostname,
         "addon_version": data.addon_version,
         "https_skill_ok": data.https_skill_ok,
         "https_stream_ok": data.https_stream_ok,

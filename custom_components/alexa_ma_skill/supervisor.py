@@ -97,7 +97,7 @@ class AlexaMaSkillSupervisor:
         """Return add-ons whose slug is the base slug or ends with it.
 
         Custom add-on repositories receive a ``<hash>_`` prefix from the
-        Supervisor, so the installed slug may be ``0cc21073_alexa_ma_skill``
+        Supervisor, so the installed slug may be ``0a1b2c3d_alexa_ma_skill``
         instead of the repository slug ``alexa_ma_skill``.
         """
         if not self._available:
@@ -194,15 +194,19 @@ class AlexaMaSkillSupervisor:
         info = await self.async_get_info()
         return info.state is AddonState.RUNNING
 
-    async def async_get_running_and_version(
+    async def async_get_installed_running_version(
         self,
-    ) -> tuple[bool, str | None]:
-        """Return whether the add-on is running and its version."""
+    ) -> tuple[bool, bool, str | None]:
+        """Return installed, running and version for the selected add-on."""
         self._require_manager()
         from homeassistant.components.hassio import AddonState
 
         info = await self.async_get_info()
-        return info.state is AddonState.RUNNING, info.version
+        return (
+            info.state is not AddonState.NOT_INSTALLED,
+            info.state is AddonState.RUNNING,
+            info.version,
+        )
 
     async def async_set_options(self, options: dict[str, Any]) -> None:
         """Merge options into the add-on configuration."""

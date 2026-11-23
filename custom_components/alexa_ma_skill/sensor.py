@@ -16,10 +16,10 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import StatusLevel
+from .const import DOMAIN, StatusLevel
 from .coordinator import AlexaMaSkillCoordinator, AlexaMaSkillData
 from .entity import AlexaMaSkillEntity, get_coordinator
-from .setup import build_setup_checklist
+from .setup import ChecklistManager, build_setup_checklist
 from .util import (
     entry_config,
     html_to_text,
@@ -144,10 +144,11 @@ async def async_setup_entry(
 ) -> None:
     """Set up the sensors."""
     coordinator = get_coordinator(hass, entry)
+    checklist = hass.data[DOMAIN][entry.entry_id].checklist
     entities: list[SensorEntity] = [
         AlexaMaSkillSensor(coordinator, entry, description) for description in SENSORS
     ]
-    entities.append(AlexaMaSkillSetupChecklistSensor(coordinator, entry))
+    entities.append(AlexaMaSkillSetupChecklistSensor(coordinator, entry, checklist))
     async_add_entities(entities)
 
 
@@ -194,33 +195,31 @@ class AlexaMaSkillSetupChecklistSensor(AlexaMaSkillEntity, SensorEntity):
         self,
         coordinator: AlexaMaSkillCoordinator,
         entry: ConfigEntry,
+        checklist: ChecklistManager,
     ) -> None:
         """Initialize the setup checklist sensor."""
         super().__init__(coordinator, entry)
+        self._checklist = checklist
         self._attr_unique_id = f"{entry.entry_id}_setup_checklist"
 
     @property
     def native_value(self) -> str:
         """Return complete, incomplete, or error."""
-        data = self.coordinator.data
-        if data is None or not self.coordinator.last_update_success:
-            return "error"
         state, _attributes = build_setup_checklist(
             entry_config(self._entry),
-            data,
+            self.coordinator.data,
             self.coordinator.hass.config.language,
+            self._checklist.confirmations,
         )
         return state
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the checklist, console values, and next actions."""
-        data = self.coordinator.data
-        if data is None:
-            return {}
         _state, attributes = build_setup_checklist(
             entry_config(self._entry),
-            data,
+            self.coordinator.data,
             self.coordinator.hass.config.language,
+            self._checklist.confirmations,
         )
         return attributes

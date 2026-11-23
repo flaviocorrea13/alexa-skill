@@ -9,14 +9,16 @@ Construir uma solução para Home Assistant que permita controlar o **Music
 Assistant** por voz usando a **Alexa**, sem depender de Nabu Casa e sem
 serviços de terceiros gerenciados pelo projeto.
 
-A solução tem duas partes:
+A solução prevê duas partes:
 
 1. **Add-on do Home Assistant** (`alexa_ma_skill/`): executa o contêiner
    upstream `ghcr.io/alams154/music-assistant-skill`, com credenciais
    persistentes, geração segura de senhas e documentação de exposição pública.
-2. **Integração personalizada** (`custom_components/`, Fase 2): configura o
-   add-on pela interface do Home Assistant, reporta diagnóstico e guia o setup
-   da skill Alexa.
+2. **Integração personalizada** (`custom_components/`, Fase 2): camada opcional
+   para configurar o add-on pela interface do Home Assistant, reportar
+   diagnóstico e guiar o setup da skill Alexa. Está implementada, mas os testes
+   completos em Linux e o Hassfest ainda estão pendentes; não é necessária para
+   o add-on.
 
 O add-on e a integração são peças separadas. Uma integração do Home Assistant
 **não pode iniciar contêineres**; ela configura o add-on via Supervisor/opções
@@ -45,16 +47,21 @@ e consulta o serviço interno.
 
 ### 2.2 Integração personalizada (Fase 2)
 
-Planejada, ainda não implementada:
+Implementada como camada **opcional**, mas ainda **não validada** por testes
+completos em Linux/Hassfest. O add-on funciona sem ela. A Fase 2 só pode ser
+considerada concluída após os testes de config flow/options flow passarem no CI,
+Hassfest e revisão de segurança final.
 
 - Fica em `custom_components/alexa_ma_skill/`.
 - Configura o add-on pela UI do Home Assistant (config flow).
 - Gera credenciais e grava as opções do add-on via Supervisor.
 - Consulta o serviço interno do add-on no hostname derivado do slug do
   Supervisor, trocando `_` por `-`: `http://<slug-com-hifens>:5000` (por
-  exemplo `0cc21073-alexa-ma-skill`).
-- A URL voltada ao usuário para o setup é
-  `https://<SKILL_HOSTNAME>/setup`.
+  exemplo `0a1b2c3d-alexa-ma-skill`).
+- O acesso ao setup suportado é **local**:
+  `http://<IP_DO_HOME_ASSISTANT>:5000/setup`. Nunca usar
+  `https://<SKILL_HOSTNAME>/setup`; esse caminho é bloqueado pela regra de
+  segurança do hostname público.
 - Deve ser compatível com HACS e ter `manifest.json` completo.
 - **Pendência registrada:** avaliar os helpers do componente `hassio` em vez de
   HTTP cru no Supervisor e declarar a dependência no `manifest.json`.
@@ -126,7 +133,7 @@ Planejada, ainda não implementada:
   preencher com o ID `amzn1.ask.skill...` para restringir a skill às próprias
   requisições. Sem ele, o upstream aceita qualquer skill assinada pela Amazon.
 - `MA_API_URL` é a API WebSocket do Music Assistant na porta **8095**. Não é a
-  porta de stream **8097**. Exemplo: `http://192.168.1.10:8095`.
+  porta de stream **8097**. Exemplo: `http://192.0.2.10:8095`.
 - `MA_API_TOKEN` é opcional. Quando informado, é gravado em
   `/data/generated_ma_api_token` (modo `600`) e o add-on passa apenas o caminho
   para a aplicação, para não expor o token no log do upstream.
@@ -159,7 +166,7 @@ Planejada, ainda não implementada:
 
 - Idioma principal: **pt-BR**. Inglês é secundário.
 - Textos de UI do add-on em `alexa_ma_skill/translations/pt-BR.yaml` e
-  `en.yaml`. A futura integração deve usar os arquivos de tradução do HA Core
+  `en.yaml`. A integração opcional usa os arquivos de tradução do HA Core
   (`translations/pt-BR.json` e `en.json`).
 - Integração em **Python async e tipado**, sem bloquear o event loop.
 - O script de entrypoint do add-on (`addon_options.py`) é um CLI de startup
@@ -168,6 +175,12 @@ Planejada, ainda não implementada:
 - Line endings LF; `.gitattributes` e `.gitignore` já configurados.
 - Não commitar segredos, credenciais, `options.json` real ou diretórios de
   dados locais.
+- Antes de abrir PR, rode `python scripts/validate_repo.py`, `ruff check .`,
+  `ruff format --check .` e os testes locais possíveis. O target do ruff é
+  `py311` porque o add-on roda no Python da imagem upstream, não no Python do
+  harness de testes.
+- A CI não publica imagens, tags ou Releases. Publicação exige autorização
+  explícita.
 
 ## 4. Variáveis reais do contêiner
 
@@ -277,28 +290,49 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 
 ### 7.1 Fase 2 — integração personalizada
 
-- Criar `custom_components/alexa_ma_skill/` com `manifest.json` completo.
-- Config flow pela UI do Home Assistant.
-- Gerar credenciais e gravar as opções do add-on.
-- Reportar diagnóstico e status.
-- Guiar o usuário no setup da skill.
+Implementada, **opcional**, com testes de helpers aprovados. A suíte completa de
+config flow/options flow, Hassfest e CI Linux ainda está pendente.
+
+- `custom_components/alexa_ma_skill/` com `manifest.json` existe.
+- Config flow pela UI do Home Assistant existe, incluindo descoberta de slug,
+  seletor para múltiplos add-ons e modo manual sem Supervisor.
+- Geração/reuso de credenciais e gravação das opções do add-on existem.
+- Diagnóstico, sensores, binary sensors e diagnostics existem.
+- Orientação do setup da skill existe no código.
 - **Usar os helpers do componente `hassio` em vez de HTTP cru no Supervisor**
-  e declarar a dependência no `manifest.json`.
-- Garantir compatibilidade HACS (`hacs.json` já existe na raiz).
-- Consultar o add-on no hostname derivado do slug do Supervisor, por exemplo
-  `http://0cc21073-alexa-ma-skill:5000`.
-- A URL de setup para o usuário é `https://<SKILL_HOSTNAME>/setup`.
+  foi implementado; a dependência declarada é `after_dependencies`.
+- Compatibilidade HACS ainda não validada (`hacs.json` existe na raiz).
+- O add-on é consultado no hostname derivado do slug do Supervisor, por
+  exemplo `http://0a1b2c3d-alexa-ma-skill:5000`.
+- O acesso ao setup é local:
+  `http://<IP_DO_HOME_ASSISTANT>:5000/setup`. A URL pública
+  `https://<SKILL_HOSTNAME>/setup` é bloqueada e não deve ser usada.
+- Pendente: executar `tests/test_config_flow.py` no Linux, Hassfest/HACS,
+  validação em HA OS e revisão de segurança final.
 
 ### 7.2 Fase 3 — setup assistido
 
-- Checklist de configuração.
-- Exibir valores necessários no console da Amazon.
-- Assistir o `/setup` com login manual na Amazon.
-- **Avisar explicitamente que o script upstream apaga skills extras chamadas
-  "Music Assistant"** e pedir confirmação antes de continuar.
-- Detectar o Skill ID via `/status`/`/setup`, avisar quando vazio ou
-  divergente e sugerir o valor correto. Persistir o último ID detectado em
-  `Store` e expor em `binary_sensor.skill_id_valid` + checklist.
+Implementado no código, **opcional**; testes de helpers aprovados, validação
+completa em Linux/HA pendente.
+
+- Checklist de 16 etapas com estados, progresso e próxima ação.
+- Modelo distingue etapas automáticas e manuais.
+- Confirmações manuais persistidas em `Store` por entry.
+- Invalidação seletiva por chave de configuração.
+- Aviso explícito sobre skills "Music Assistant" duplicadas antes da etapa
+  sensível.
+- `SKILL_ID` detectado/configurado/sugerido e `binary_sensor.skill_id_valid`.
+- Instruções do provider Alexa do MA, portas `5000`, `8095` e `8097`.
+- Testes de reprodução e comandos dependem de confirmação manual real.
+- Pendente: executar config flow/options flow no Linux, Hassfest, HACS Action,
+  CI e validação em HA OS.
+
+### 7.3 Fase 4 — distribuição
+
+Preparada, **não publicada**. Documentação, validador local, CI, templates,
+matriz de validação, checklist de prontidão e rascunho de release existem.
+Hassfest, HACS Action, `pytest` no Linux, instalação da `0.2.0` em HA OS e
+screenshots reais continuam pendentes. Ver seção 15.
 
 ## 8. Regras de implementação
 
@@ -312,19 +346,22 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 - Não adicionar `build.yaml`.
 - Não usar `:latest`.
 - Não definir `ASK_CREDENTIALS_DIR`.
-- Não expor `/setup`, `/status`, `/devices`, `/docs`, `/ma` ou `/alexa`
-  publicamente.
+- Não expor `/setup`, `/setup/*`, `/status`, `/status/*`, `/devices`, `/docs`,
+  `/openapi.json`, `/ma`, `/alexa`, `/simulator` ou `/invocations` publicamente.
 - Não adicionar Caddy/nginx/túnel ao add-on.
 - Não commitar segredos ou dados de `/data`.
 - Manter line endings LF.
 
 ## 9. Estado atual
 
-### 9.1 Fase 1 concluída
+### 9.1 Fase 1 implementada; validação real parcial
 
-- Commit: `92b3d21`
+- Commit inicial: `92b3d21`
 - Mensagem: `feat(addon): adiciona add-on Alexa MA Skill com persistência de credenciais ASK`
 - Branch: `main`
+- Estado: implementação concluída, testes locais possíveis executados e
+  evidência real parcial em HA OS. A matriz manual completa continua pendente;
+  a Fase 1 **não** é declarada integralmente validada.
 
 ### 9.2 Arquivos principais
 
@@ -332,11 +369,33 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 .
 ├── repository.yaml
 ├── hacs.json
+├── pyproject.toml                   # ruff + pytest
 ├── README.md
 ├── AGENTS.md
+├── requirements_test.txt            # harness Home Assistant (Linux)
+├── requirements_ci.txt              # ruff + PyYAML
+├── scripts/
+│   ├── validate_repo.py             # validação local/CI
+│   └── run_hassfest_subset.py       # Hassfest local sem Docker
+├── .github/
+│   ├── workflows/ci.yml
+│   ├── ISSUE_TEMPLATE/
+│   └── pull_request_template.md
+├── docs/
+│   ├── DISTRIBUTION-READINESS.md
+│   ├── VALIDATION-MATRIX.md
+│   ├── releases/RELEASE-DRAFT.md
+│   └── images/README.md             # capturas pendentes
 ├── LICENSE
 ├── LICENSE-AMAZON-SOFTWARE-1.0
 ├── THIRD_PARTY_NOTICES.md
+├── custom_components/
+│   └── alexa_ma_skill/              # Integração opcional
+├── tests/
+│   ├── conftest.py
+│   ├── test_addon_options.py
+│   ├── test_integration_helpers.py
+│   └── test_config_flow.py
 └── alexa_ma_skill/
     ├── config.yaml
     ├── Dockerfile
@@ -349,15 +408,43 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
         └── en.yaml
 ```
 
-### 9.3 Validação já executada na Fase 1
+O `PLANO-PUBLICACAO.md` é um documento interno de planejamento mantido no
+worktree local e **fora do repositório público/PR**.
+
+### 9.3 Validação já executada
 
 - YAML/JSON parseados.
 - `addon_options.py` compilado.
-- `bash -n alexa_ma_skill/run.sh` aprovado.
-- Testes do script de opções: geração/reuso de credenciais, caminhos de
-  arquivo, token do MA, hostnames inválidos, porta/idioma inválidos,
-  exportação NUL-separated com espaços e quebras de linha.
+- `bash -n alexa_ma_skill/run.sh` aprovado (Git Bash).
+- `ruff check` e `ruff format --check` aprovados.
+- `tests/test_addon_options.py` com `unittest`: geração/reuso de credenciais,
+  remoção de credenciais geradas ao usar credenciais explícitas, token do MA,
+  validação de `MA_API_URL`, hostnames inválidos, porta/idioma inválidos e
+  normalização de booleanos. Permissões POSIX ficam puladas no Windows.
+- `tests/test_integration_helpers.py` com `unittest` e as bibliotecas do HA:
+  descoberta de slug, validação de hostname/URL, preservação de opções,
+  parsing de `/status`/`/setup`, checklist, sensores, diagnostics e lógica do
+  coordinator. Executado com `.venv` no Windows.
+- `tests/test_config_flow.py`: escrito para o harness Linux do Home Assistant,
+  mas **não executado** no Windows. Apenas `--collect-only`: 6 testes coletados.
+- Em 23/11/2026, para validação operacional da Fase 4, a suíte foi executada no
+  Windows com shims `fcntl`/`resource` e sockets habilitados, mantidos **fora do
+  repositório**: **6 config flow OK** e **55 passed, 1 skipped, 26 subtests** no
+  `pytest` completo. Isso é evidência suplementar, **não** substitui Linux/CI.
+- `scripts/validate_repo.py`: valida metadados, versões, manifestos, links,
+  traduções (URLs/HTML/placeholders), steps/menu do config flow, LF e padrões de
+  segredo. A auditoria estática do Hassfest corrigiu a ordem do `manifest.json`
+  e removeu URLs das traduções.
+- Hassfest: **10 plugins oficiais** (HA Core `2026.10.4`) passaram com 0 erros
+  via `scripts/run_hassfest_subset.py`; a imagem oficial e o plugin
+  `dependencies` continuam pendentes. HACS Action e CI Linux **não executados**.
+  O workflow existe em `.github/workflows/ci.yml`.
 - Verificação de LF.
+- Em HA OS real, com evidência do usuário: add-on `0.1.1` instalado e
+  atualizado pela loja, `/setup` reutilizou a skill, provider Alexa do Music
+  Assistant configurado, áudio e invocação `music assistant` funcionaram em um
+  Echo Cozinha. Isso não cobre a matriz completa de testes manuais.
+- A versão candidata `0.2.0` **não foi instalada** em HA OS nesta etapa.
 
 Build Docker e testes em HA OS ainda são manuais; não há Docker/HA OS no
 ambiente de desenvolvimento usado até agora.
@@ -375,29 +462,50 @@ Cobrir, no mínimo:
 - `POST /` sem basic auth, mas com validação de assinatura da Alexa;
 - setup completo na Amazon, `Done. Skill ID`, habilitação da skill;
 - regra Cloudflare bloqueando tudo exceto `POST /`;
-- áudio via `MA_HOSTNAME` e comandos via `MA_API_URL`/`MA_API_TOKEN`;
+- matriz externa de `/setup`, `/status`, `/devices`, `/docs`, `/ma` e `/alexa`;
+- provider Alexa do Music Assistant e `/ma/latest-url`;
+- áudio via `MA_HOSTNAME` e comandos via `MA_API_URL` (e `MA_API_TOKEN`
+  quando a API exigir autenticação);
+- Echo com tela e Echo sem tela;
 - backup/restauração `cold`;
 - build/início em `amd64` e `aarch64`.
 
 ## 10. Comandos úteis
 
-Validação rápida sem Docker:
+Validação completa disponível sem Docker (Windows ou Linux):
 
 ```bash
-python -m py_compile alexa_ma_skill/addon_options.py
+python scripts/validate_repo.py
+python -m unittest tests.test_addon_options
+ruff check .
+ruff format --check .
+python -m compileall -q alexa_ma_skill custom_components tests scripts
 bash -n alexa_ma_skill/run.sh
-python - <<'PY'
-from pathlib import Path
-import json
-import yaml
-
-for path in Path('.').rglob('*.yaml'):
-    yaml.safe_load(path.read_text(encoding='utf-8'))
-for path in Path('.').rglob('*.json'):
-    json.loads(path.read_text(encoding='utf-8'))
-print('YAML/JSON OK')
-PY
 ```
+
+`scripts/validate_repo.py` usa `requirements_ci.txt` (PyYAML e ruff fixados) e
+verifica metadados do add-on e da integração, consistência de versão entre
+`config.yaml`, `manifest.json` e CHANGELOG, links relativos, line endings LF e
+padrões comuns de segredo.
+
+### Hassfest local (sem Docker)
+
+Quando não houver Docker, é possível rodar os plugins oficiais do Hassfest com:
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/home-assistant/core.git /tmp/ha-core
+git -C /tmp/ha-core sparse-checkout set script/hassfest script/translations
+git -C /tmp/ha-core fetch --depth 1 origin tag 2026.10.4
+git -C /tmp/ha-core checkout --detach 2026.10.4
+python scripts/run_hassfest_subset.py --core-path /tmp/ha-core
+```
+
+Use a tag do Core que corresponda à versão do pacote `homeassistant` instalado.
+O script roda `json`, `manifest`, `translations`, `services`, `icons`,
+`integration_type`, `config_schema`, `codeowners`, `requirements` e
+`config_flow`. Ele **não** substitui a action oficial (que inclui o plugin
+`dependencies` e roda em Docker no CI).
 
 ### Validação no Windows
 
@@ -405,15 +513,27 @@ A suíte completa do Home Assistant **não roda no Windows**: o
 `pytest-homeassistant-custom-component`/Home Assistant importa `fcntl`.
 **Não tente rodar o `pytest` completo localmente no Windows.**
 
+> Exceção registrada na validação da Fase 4: uma execução suplementar no Windows
+> usou shims `fcntl`/`resource` e sockets habilitados, mantidos **fora do
+> repositório**. Ela produziu 6 config flow OK e 55 passed/1 skipped/26 subtests,
+> mas **não é reproduzível pelo projeto nem substitui** a CI Linux. Não adicione
+> esses shims ao repositório.
+
 Validação local no Windows:
+- `python scripts/validate_repo.py`
 - `ruff check .`
 - `ruff format --check .`
-- `python -m compileall -q custom_components/alexa_ma_skill alexa_ma_skill`
-- testes que não importam Home Assistant, como os do `addon_options.py`
+- `python -m compileall -q alexa_ma_skill custom_components tests scripts`
+- testes que não importam Home Assistant:
+  `python -m unittest tests.test_addon_options`
+- testes dos helpers da integração, usando o virtualenv:
+  `.venv/Scripts/python.exe -m unittest tests.test_integration_helpers`
 
-O `pytest` completo da integração roda no CI Linux. O pacote previsto é
-`pytest-homeassistant-custom-component==0.13.375` (Home Assistant 2026.10.4,
-Python >= 3.14).
+O `pytest` completo da integração **deve** rodar no CI Linux. O workflow está em
+`.github/workflows/ci.yml`; a primeira execução depende de push/PR e ainda não
+ocorreu. O pacote é `pytest-homeassistant-custom-component==0.13.375` (Home
+Assistant 2026.10.4, Python >= 3.14). `tests/conftest.py` registra o plugin do
+harness e `pyproject.toml` define `asyncio_mode = "auto"`.
 
 ### WSL (opcional)
 
@@ -426,19 +546,19 @@ sudo apt update
 sudo apt install -y curl
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv --python 3.14 .venv
-uv pip install pytest-homeassistant-custom-component==0.13.375
+uv pip install -r requirements_test.txt
 uv run pytest -q
 ```
 
-Ajuste o Python/venv se a distro já tiver 3.14. O `requirements_test.txt` e a
-pasta `tests/` serão adicionados na etapa de CI/testes; até lá, os comandos
-acima servem de referência.
+Ajuste o Python/venv se a distro já tiver 3.14. `requirements_test.txt` e a
+pasta `tests/` já existem; a suíte completa de config flow/options flow ainda
+precisa ser executada (localmente via WSL ou no CI Linux).
 
 Leitura das credenciais geradas (HA OS com acesso ao host):
 
 ```sh
 # Substitua <slug> pelo slug real do Supervisor, por exemplo
-# 0cc21073_alexa_ma_skill.
+# 0a1b2c3d_alexa_ma_skill.
 docker exec addon_<slug> cat /data/generated_app_username
 docker exec addon_<slug> cat /data/generated_app_password
 ```
@@ -522,7 +642,7 @@ itens abaixo são fatos observados e não devem ser revertidos sem novo teste.
 
 - Add-ons instalados de um repositório personalizado recebem um prefixo
   `<hash>_` do Supervisor. O slug real pode ser
-  `0cc21073_alexa_ma_skill`, e não `alexa_ma_skill`.
+  `0a1b2c3d_alexa_ma_skill`, e não `alexa_ma_skill`.
 - A integração **não** deve fixar o hash nem o slug completo:
   - lista os add-ons com `get_addons_info(hass)` do componente `hassio`;
   - aceita slug igual a `alexa_ma_skill` ou terminado em `_alexa_ma_skill`;
@@ -531,7 +651,7 @@ itens abaixo são fatos observados e não devem ser revertidos sem novo teste.
   - usa esse slug em todas as chamadas do `AddonManager` (`info`, `options`,
     `start`, `restart`, `stop`).
 - O hostname interno é derivado do slug trocando `_` por `-`:
-  `0cc21073_alexa_ma_skill` → `0cc21073-alexa-ma-skill`. O valor fixo
+  `0a1b2c3d_alexa_ma_skill` → `0a1b2c3d-alexa-ma-skill`. O valor fixo
   `alexa-ma-skill` não deve ser usado no modo gerenciado.
 - Se nenhum add-on for encontrado, logar em `debug` a lista de slugs
   encontrados e mostrar a mensagem de add-on não instalado.
@@ -572,3 +692,235 @@ itens abaixo são fatos observados e não devem ser revertidos sem novo teste.
 - Erro real observado: `API URL` com um dígito errado na porta `5000` fazia o
   provider falhar silenciosamente; o `curl /ma/latest-url` retornava `404`.
 - Não registrar credenciais reais em documentação, logs ou commits.
+
+## 13. Integração personalizada (Fase 2)
+
+### 13.1 Estrutura e contratos
+
+- Código em `custom_components/alexa_ma_skill/`.
+- Metadados em `manifest.json`; dependência declarada como
+  `after_dependencies: ["hassio"]`.
+- `hacs.json` declara Home Assistant mínimo `2026.10.4`, a versão usada no
+  desenvolvimento; versões anteriores não foram validadas.
+- A integração é opcional; o add-on funciona sem ela.
+- O Supervisor é acessado pelos helpers do componente `hassio`
+  (`get_addons_info` e `AddonManager`), não por HTTP cru.
+- O slug real é descoberto por igualdade com `alexa_ma_skill` ou sufixo
+  `_alexa_ma_skill`. O hash do repositório personalizado nunca é fixado.
+- O slug escolhido é persistido em `CONF_ADDON_SLUG` e usado em todas as
+  operações do `AddonManager`.
+- O hostname interno é o `hostname` retornado pelo Supervisor ou, como
+  fallback, o slug com `_` trocado por `-`.
+- A integração consulta `/status?format=json` e `/setup?format=json` com
+  timeout curto; falhas do `/setup` ficam em nível debug.
+
+### 13.2 Config flow e opções
+
+- Modos: gerenciado, manual e reauth.
+- Descoberta: nenhum add-on mostra `addon_not_installed` com instrução do
+  repositório; um seleciona automaticamente; vários mostram `addon_select`.
+- Credenciais existentes em texto no add-on são reutilizadas; se estiverem em
+  arquivos ou ausentes, novas credenciais fortes são geradas e exibidas uma
+  vez.
+- O options flow usa `AddonManager.async_configure_addon`, que mescla opções
+  atuais e preserva chaves desconhecidas.
+- Senhas e tokens deixados em branco são preservados quando possível. Valores
+  em arquivo não são usados como senha HTTP; nesse caso, a senha armazenada na
+  config entry é usada para autenticação.
+- `MA_API_URL` aceita `http`, `https`, `ws` e `wss`, exige host e rejeita
+  credenciais embutidas. O token é opcional quando o MA não exige auth.
+- `MA_HOSTNAME` é opcional, como no schema do add-on.
+- `TZ` não é gerenciado pela integração; é preservado.
+- Reinício do add-on exige confirmação no options flow.
+
+### 13.3 Segurança
+
+- Segredos não aparecem em logs, entidades ou diagnostics.
+- Diagnostics mascaram `SKILL_ID` e redigem senhas/tokens/stream URLs.
+- A URL pública de `/setup` não é usada nem exposta como atalho.
+- Remover a integração não para o add-on, não apaga opções, credenciais ASK ou
+  dados em `/data`.
+
+### 13.4 Testes e pendências
+
+- `python -m unittest tests.test_addon_options`: testes puros do add-on.
+- `.venv/Scripts/python.exe -m unittest tests.test_integration_helpers`:
+  helpers da integração com bibliotecas do HA.
+- `python -m pytest tests/test_config_flow.py`: harness Linux do HA.
+- Pendente: executar config flow/options flow completos no Linux, Hassfest,
+  HACS Action, CI e validação em HA OS.
+- Fase 3 implementada no código; validação completa pendente.
+
+## 14. Setup assistido (Fase 3)
+
+### 14.1 Arquitetura
+
+- O checklist vive em `custom_components/alexa_ma_skill/setup.py`.
+- 16 etapas em `STEP_DEFINITIONS`, com IDs estáveis, dependências, modo
+  automático/manual e textos pt-BR/en.
+- Estados: `not_started`, `pending`, `checking`, `done`, `attention`,
+  `blocked`, `not_applicable`.
+- O sensor `sensor.setup_checklist` expõe `progress`, `checklist`,
+  `manual_steps` e a próxima etapa nos atributos.
+- O acesso ao setup é pelo options flow: **Configurar > Setup assistido**.
+- O menu do options flow separa **Configurar opções** de **Setup assistido**.
+
+### 14.2 Persistência
+
+- Confirmações manuais em `Store` separado por config entry:
+  `alexa_ma_skill.<entry_id>.checklist`.
+- Armazena apenas `{step_id: {"at": timestamp}}`; não armazena senhas, tokens,
+  cookies ou dados Amazon.
+- O progresso sobrevive a reinícios do HA, reinícios do add-on, atualização da
+  integração e fechamento da UI.
+- `ChecklistManager.async_clear_for_keys()` invalida seletivamente:
+  - `SKILL_HOSTNAME` não apaga autorização Amazon;
+  - `MA_HOSTNAME` invalida provider/stream/reprodução;
+  - `MA_API_URL`/token invalidam API/comandos;
+  - credenciais invalidam acesso local/provider/comandos;
+  - mudança de slug/add-on invalida etapas dependentes.
+- Alterações feitas fora da integração só são refletidas nas etapas
+  automáticas; confirmações manuais antigas podem permanecer até a próxima
+  alteração via options flow.
+
+### 14.3 Etapas automáticas
+
+- add-on instalado/iniciado, credenciais, hostnames, `SKILL_ID`,
+  `/status`/`/setup` e HTTPS do stream.
+- O teste da API do MA **não** é automático: não há contrato confiável no add-on
+  para testar a porta `8095`, e uma conexão de teste poderia alterar estado do
+  player. Só o formato de `MA_API_URL` é validado.
+- Automático significa “evidência disponível”; não significa validação
+  externa completa.
+
+### 14.4 Etapas manuais
+
+- acesso local ao `/setup`;
+- autorização Amazon;
+- criação/reutilização da skill (com aviso de duplicatas);
+- habilitação da skill;
+- provider Alexa no MA;
+- teste da API do MA (quando `MA_API_URL` estiver configurada);
+- teste de reprodução;
+- teste de comandos.
+
+Nenhuma etapa Amazon é executada automaticamente. A integração não solicita
+senha Amazon, não acessa a conta e não executa o script de criação de skill.
+Desmarcar uma etapa manual remove as confirmações das etapas manuais
+dependentes, para não reutilizar confirmação fora de contexto.
+
+### 14.5 Testes
+
+- `tests/test_integration_helpers.py` cobre IDs, progresso, estados,
+  persistência, invalidação seletiva, parsing e segurança.
+- O options flow completo ainda depende do harness Linux.
+- Testes de reprodução/comandos e provider exigem HA OS, MA e Echo reais.
+
+## 15. Fase 4 — distribuição e CI
+
+### 15.1 Versão
+
+- Versão candidata única: **`0.2.0`**, presente em `alexa_ma_skill/config.yaml`,
+  `custom_components/alexa_ma_skill/manifest.json` e no topo do
+  `alexa_ma_skill/CHANGELOG.md`.
+- O add-on não declara `image:`; o Supervisor constrói a imagem localmente a
+  partir do `Dockerfile`. Não é necessário publicar imagem para testar a versão.
+- A `0.2.0` **não foi publicada, tagueada ou instalada** em HA OS.
+- `scripts/validate_repo.py` falha se as três versões divergirem ou se o
+  CHANGELOG não tiver a seção correspondente.
+
+### 15.2 Estrutura de distribuição
+
+- `README.md`: página pública (apresentação, recursos, requisitos, instalação,
+  arquitetura, segurança, problemas, suporte, licença).
+- `alexa_ma_skill/DOCS.md`: manual completo do add-on, exibido na loja.
+- `AGENTS.md`: contexto de desenvolvimento e manutenção.
+- `docs/VALIDATION-MATRIX.md`: ambiente, procedimento, resultado, evidência e
+  pendência por componente.
+- `docs/HAOS-TEST-PLAN.md`: roteiro reproduzível de instalação, backup,
+  restauração e testes reais.
+- `docs/DISTRIBUTION-READINESS.md`: checklist objetivo de prontidão.
+- `docs/releases/RELEASE-DRAFT.md`: rascunho não publicado.
+- `docs/images/README.md`: capturas pendentes e regras de privacidade.
+- `.github/ISSUE_TEMPLATE/`: bug e feature request; `config.yml` aponta para a
+  documentação e a matriz.
+- `pyproject.toml`: configuração de ruff e pytest (`asyncio_mode = "auto"`).
+- `requirements_ci.txt`: PyYAML e ruff fixados.
+
+### 15.3 CI
+
+`.github/workflows/ci.yml` roda em Linux com `permissions: contents: read` e
+`concurrency`. Jobs:
+
+1. `repository`: instala `requirements_ci.txt`, roda
+   `scripts/validate_repo.py`, `compileall`, `bash -n`, testes do add-on,
+   `ruff check` e `ruff format --check`.
+2. `integration`: instala `requirements_test.txt` e roda `python -m pytest -q`
+   com `tests/conftest.py` e o harness do Home Assistant.
+3. `hassfest`: `home-assistant/actions/hassfest@<sha>` (fixado por commit).
+4. `hacs`: `hacs/action@<sha>` com `category: integration`,
+   `ignore: brands description issues topics` (separado por espaço) e
+   `comment: "false"`.
+
+As actions são fixadas por SHA de commit e o `.github/dependabot.yml` mantém os
+SHAs atualizados. Nota: Hassfest e HACS são Docker actions publicadas pelos
+mantenedores; o SHA fixa o repositório da action, mas a imagem Docker referenciada
+internamente continua sendo resolvida pelo mantenedor. Regras: não publicar
+imagens, tags ou Releases; não usar `:latest`; não exigir credenciais pessoais;
+não mascarar falhas com `continue-on-error`. A CI foi auditada e corrigida, mas
+**não executada** nesta etapa. O workflow passou no `actionlint 1.7.12` com 0
+erros, o que valida sintaxe, expressões e entradas das actions, mas não substitui
+a execução real.
+
+### 15.4 Validador local
+
+`scripts/validate_repo.py` verifica:
+
+- `repository.yaml`, `hacs.json`, `config.yaml` e `manifest.json`;
+- coerência de nome, slug, domínio, URL, issue tracker e versões;
+- `SKILL_HOSTNAME` obrigatório, opções com schema, portas, watchdog e webui;
+- `FROM` com tag e digest, sem `:latest`, com `ENTRYPOINT`/`CMD`;
+- traduções do add-on e da integração (estrutura, placeholders de entidade,
+  URLs/HTML não permitidos e espaços nas pontas);
+- steps e `menu_options` do config flow contra o `strings.json`;
+- chaves permitidas no `hacs.json` e uma única integração em
+  `custom_components/`;
+- actions da CI fixadas por SHA e lista `ignore` do HACS separada por espaço;
+- parse de todos os YAML/JSON, links relativos e LF;
+- padrões comuns de segredo (GitHub, AWS, chaves privadas, Slack);
+- existência dos documentos de distribuição e do workflow.
+- `scripts/run_hassfest_subset.py`: executa plugins oficiais do Hassfest contra
+  um checkout do Core, útil quando não há Docker; não substitui a action
+  oficial.
+
+### 15.5 HACS e add-on
+
+- HACS: instalação documentada como **repositório personalizado**. A inclusão no
+  catálogo padrão **não** foi solicitada e depende de HACS Action sem ignores,
+  Hassfest, uma Release completa, metadados do GitHub
+  (description/topics/issues) e `brand/icon.png`.
+- Falta `custom_components/alexa_ma_skill/brand/icon.png`; o HACS usa o domínio
+  em `home-assistant/brands` como alternativa, mas o arquivo local ainda não
+  existe.
+- O HACS Action valida o repositório **remoto**; sem push, ele não enxerga o
+  worktree atual.
+- Add-on: `repository.yaml` na raiz e `alexa_ma_skill/config.yaml` com `slug`,
+  `arch`, `ports`, `schema`, `watchdog`, `webui` e `backup: cold`.
+- A imagem upstream permanece
+  `ghcr.io/alams154/music-assistant-skill:0.0.39-beta@sha256:b1ef...0f90f1`.
+  Em 23/11/2026 o registry respondeu HTTP 200 com esse digest e um índice OCI
+  contendo `linux/amd64` e `linux/arm64`; o build do add-on não foi executado.
+- Nenhum build ou publicação de imagem foi executado.
+
+### 15.6 Pendências da Fase 4
+
+- Primeira execução da CI, Hassfest e HACS Action (exigem push e/ou Docker).
+- `pytest` oficial em Linux (o Windows com shims é evidência suplementar).
+- Instalação da `0.2.0` em HA OS `amd64` e, se possível, `aarch64`.
+- Comandos, backup/restauração e acesso externo completo.
+- `brand/icon.png` e uma Release completa para o catálogo padrão do HACS.
+- Screenshots reais sem dados sensíveis.
+- Autorização explícita antes de tag, Release ou anúncio.
+
+A Fase 4 **não é declarada concluída** enquanto os itens acima estiverem
+pendentes. A Fase 5 não foi iniciada.

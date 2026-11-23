@@ -1,0 +1,5 @@
+# Tools used by the repository/CI validation job.
+# Pinned so the pipeline is reproducible. Keep in sync with the local
+# development environment documented in AGENTS.md.
+PyYAML==6.0.4
+ruff==0.17.3
