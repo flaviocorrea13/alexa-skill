@@ -386,6 +386,41 @@ print('YAML/JSON OK')
 PY
 ```
 
+### Validação no Windows
+
+A suíte completa do Home Assistant **não roda no Windows**: o
+`pytest-homeassistant-custom-component`/Home Assistant importa `fcntl`.
+**Não tente rodar o `pytest` completo localmente no Windows.**
+
+Validação local no Windows:
+- `ruff check .`
+- `ruff format --check .`
+- `python -m compileall -q custom_components/alexa_ma_skill alexa_ma_skill`
+- testes que não importam Home Assistant, como os do `addon_options.py`
+
+O `pytest` completo da integração roda no CI Linux. O pacote previsto é
+`pytest-homeassistant-custom-component==0.13.375` (Home Assistant 2026.10.4,
+Python >= 3.14).
+
+### WSL (opcional)
+
+Para rodar a suíte do HA no Windows via WSL, dentro do diretório do repositório:
+
+```bash
+wsl --install -d Ubuntu
+# dentro do WSL:
+sudo apt update
+sudo apt install -y curl
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv venv --python 3.14 .venv
+uv pip install pytest-homeassistant-custom-component==0.13.375
+uv run pytest -q
+```
+
+Ajuste o Python/venv se a distro já tiver 3.14. O `requirements_test.txt` e a
+pasta `tests/` serão adicionados na etapa de CI/testes; até lá, os comandos
+acima servem de referência.
+
 Leitura das credenciais geradas (HA OS com acesso ao host):
 
 ```sh
