@@ -1,0 +1,156 @@
+{
+  "title": "Alexa MA Skill",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Alexa MA Skill",
+        "description": "A integração verifica se o Supervisor está disponível e então configura o add-on ou um contêiner gerenciado externamente."
+      },
+      "addon": {
+        "title": "Configurar o add-on",
+        "description": "O add-on Alexa MA Skill precisa estar instalado. Credenciais fortes do painel serão geradas. O login na Amazon é sempre manual.",
+        "data": {
+          "skill_hostname": "Hostname público da skill",
+          "ma_hostname": "Hostname público do stream do Music Assistant",
+          "locale": "Idioma da skill",
+          "enable_apl": "Habilitar APL",
+          "skip_url_validation": "Pular validação da URL de áudio",
+          "ma_api_url": "URL da API do Music Assistant (avançado)",
+          "ma_api_token": "Token da API do Music Assistant (avançado)",
+          "ignore_https": "Ignorar verificação HTTPS"
+        },
+        "data_description": {
+          "skill_hostname": "Somente o hostname, por exemplo skill.exemplo.com. O túnel deve encaminhá-lo para a porta 5000 do add-on.",
+          "ma_hostname": "Somente o hostname, por exemplo ma.exemplo.com. Obrigatório. O túnel deve encaminhá-lo para a porta de stream do Music Assistant, normalmente 8097.",
+          "locale": "Idioma usado ao criar e habilitar a skill Alexa.",
+          "enable_apl": "Habilita Alexa Presentation Language em dispositivos com tela.",
+          "skip_url_validation": "Não valida a URL do stream do Music Assistant antes de enviá-la à Alexa.",
+          "ma_api_url": "URL base da API WebSocket do Music Assistant na porta 8095. Não é a porta de stream 8097. Exige MA_API_TOKEN.",
+          "ma_api_token": "Token da API do Music Assistant. Informe junto com MA_API_URL, ou deixe os dois em branco.",
+          "ignore_https": "Ignora a verificação de certificado no teste de conectividade. Use apenas para hairpin NAT ou endpoints de teste com certificado autoassinado."
+        }
+      },
+      "manual": {
+        "title": "Configuração manual",
+        "description": "Use a URL interna de um contêiner gerenciado externamente. O login na Amazon é sempre manual.",
+        "data": {
+          "base_url": "URL base interna",
+          "username": "Usuário",
+          "password": "Senha",
+          "skill_hostname": "Hostname público da skill",
+          "ma_hostname": "Hostname público do stream do Music Assistant",
+          "locale": "Idioma da skill",
+          "enable_apl": "Habilitar APL",
+          "skip_url_validation": "Pular validação da URL de áudio",
+          "ma_api_url": "URL da API do Music Assistant (avançado)",
+          "ma_api_token": "Token da API do Music Assistant (avançado)",
+          "ignore_https": "Ignorar verificação HTTPS"
+        },
+        "data_description": {
+          "base_url": "URL interna do contêiner do add-on, por exemplo http://alexa-ma-skill:5000 ou http://192.168.1.10:5000.",
+          "username": "Usuário da autenticação básica de /setup e /status.",
+          "password": "Senha da autenticação básica de /setup e /status.",
+          "skill_hostname": "Somente o hostname, por exemplo skill.exemplo.com.",
+          "ma_hostname": "Somente o hostname, por exemplo ma.exemplo.com.",
+          "locale": "Idioma usado ao criar e habilitar a skill Alexa.",
+          "enable_apl": "Habilita Alexa Presentation Language em dispositivos com tela.",
+          "skip_url_validation": "Não valida a URL do stream do Music Assistant antes de enviá-la à Alexa.",
+          "ma_api_url": "URL base da API WebSocket do Music Assistant na porta 8095. Não é a porta de stream 8097.",
+          "ma_api_token": "Token da API do Music Assistant. Deixe em branco se a API não exigir autenticação.",
+          "ignore_https": "Ignora a verificação de certificado se a URL interna usar HTTPS com certificado autoassinado."
+        }
+      },
+      "credentials": {
+        "title": "Credenciais geradas",
+        "description": "Guarde estas credenciais; elas não serão exibidas novamente.\n\nUsuário: `{username}`\nSenha: `{password}`\n\nElas também foram gravadas nas opções do add-on.",
+        "data": {
+          "confirm": "Salvei as credenciais"
+        },
+        "data_description": {
+          "confirm": "Envie para criar a entrada da integração. As credenciais não serão exibidas novamente."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reautenticar",
+        "description": "No modo gerenciado, as credenciais são relidas das opções do add-on. No modo manual, informe as novas credenciais. O login na Amazon é sempre manual.",
+        "data": {
+          "confirm": "Tentar novamente após corrigir as opções do add-on",
+          "base_url": "URL base interna",
+          "username": "Usuário",
+          "password": "Senha",
+          "ignore_https": "Ignorar verificação HTTPS"
+        },
+        "data_description": {
+          "confirm": "Envie este formulário novamente depois de corrigir APP_USERNAME/APP_PASSWORD nas opções do add-on.",
+          "base_url": "URL interna do contêiner do add-on.",
+          "username": "Usuário da autenticação básica de /setup e /status.",
+          "password": "Senha da autenticação básica de /setup e /status.",
+          "ignore_https": "Ignora a verificação de certificado se a URL interna usar HTTPS com certificado autoassinado."
+        }
+      }
+    },
+    "error": {
+      "invalid_hostname": "Hostname ou URL inválido. Use um hostname puro, sem http://, sem caminho e sem porta.",
+      "https_unreachable": "Não foi possível alcançar https://{host}/. Verifique o DNS, o túnel e o certificado. Para hairpin NAT, ative 'Ignorar verificação HTTPS'. As credenciais do painel já foram gravadas no add-on; corrija o endpoint e execute o setup novamente.",
+      "invalid_auth": "Usuário ou senha inválidos.",
+      "cannot_connect": "Não foi possível conectar ao add-on. Verifique se ele está rodando e se a URL interna está correta.",
+      "addon_not_installed": "O add-on Alexa MA Skill não está instalado. Instale-o pela loja de add-ons.",
+      "addon_options_invalid": "As opções gravadas no add-on não puderam ser validadas. Verifique as opções do add-on.",
+      "addon_start_timeout": "O add-on não respondeu em até 90 segundos. Verifique os logs do add-on e tente novamente.",
+      "ma_api_incomplete": "Informe MA_API_URL e MA_API_TOKEN juntos, ou deixe os dois em branco."
+    },
+    "abort": {
+      "already_configured": "A integração Alexa MA Skill já está configurada.",
+      "reauth_successful": "Reautenticação concluída.",
+      "reauth_failed": "Não foi possível reautenticar. Inicie a configuração novamente."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opções do Alexa MA Skill",
+        "description": "No modo gerenciado, as alterações são sincronizadas com o add-on e o add-on é reiniciado quando necessário. O login na Amazon é sempre manual.",
+        "data": {
+          "skill_hostname": "Hostname público da skill",
+          "ma_hostname": "Hostname público do stream do Music Assistant",
+          "username": "Usuário",
+          "password": "Senha (deixe em branco para manter a atual)",
+          "locale": "Idioma da skill",
+          "enable_apl": "Habilitar APL",
+          "skip_url_validation": "Pular validação da URL de áudio",
+          "skill_id": "ID da skill (avançado)",
+          "ma_api_url": "URL da API do Music Assistant (avançado)",
+          "ma_api_token": "Token da API do Music Assistant (deixe em branco para manter o atual)",
+          "scan_interval": "Intervalo de atualização (segundos)",
+          "ignore_https": "Ignorar verificação HTTPS",
+          "base_url": "URL base interna"
+        },
+        "data_description": {
+          "skill_hostname": "Somente o hostname, por exemplo skill.exemplo.com.",
+          "ma_hostname": "Somente o hostname, por exemplo ma.exemplo.com.",
+          "username": "Usuário da autenticação básica de /setup e /status.",
+          "password": "Deixe em branco para manter a senha atual.",
+          "locale": "Idioma usado ao criar e habilitar a skill Alexa.",
+          "enable_apl": "Habilita Alexa Presentation Language em dispositivos com tela.",
+          "skip_url_validation": "Não valida a URL do stream do Music Assistant antes de enviá-la à Alexa.",
+          "skill_id": "ID retornado pelo setup, usado para restringir as requisições a esta skill.",
+          "ma_api_url": "URL base da API WebSocket do Music Assistant na porta 8095. Não é a porta de stream 8097.",
+          "ma_api_token": "Deixe em branco para manter o token atual. Limpe MA_API_URL para remover os dois.",
+          "scan_interval": "Intervalo do status barato, de 10 a 300 segundos. A checagem detalhada do ASK continua em cerca de 5 minutos.",
+          "ignore_https": "Ignora a verificação de certificado nos testes HTTPS.",
+          "base_url": "URL interna de um contêiner gerenciado externamente."
+        }
+      }
+    },
+    "error": {
+      "invalid_hostname": "Hostname ou URL inválido. Use um hostname puro, sem http://, sem caminho e sem porta.",
+      "https_unreachable": "Não foi possível alcançar https://{host}/. Verifique o DNS, o túnel e o certificado.",
+      "invalid_auth": "Usuário ou senha inválidos.",
+      "cannot_connect": "Não foi possível conectar ao add-on. Verifique se ele está rodando e se a URL interna está correta.",
+      "addon_not_installed": "O add-on Alexa MA Skill não está instalado. Instale-o pela loja de add-ons.",
+      "addon_options_invalid": "As opções gravadas no add-on não puderam ser validadas. Verifique as opções do add-on.",
+      "addon_start_timeout": "O add-on não respondeu em até 90 segundos. Verifique os logs do add-on e tente novamente.",
+      "ma_api_incomplete": "Informe MA_API_URL e MA_API_TOKEN juntos, ou deixe os dois em branco."
+    }
+  }
+}

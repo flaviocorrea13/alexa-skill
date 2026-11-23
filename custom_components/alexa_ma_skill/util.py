@@ -8,7 +8,14 @@ from html import unescape
 from html.parser import HTMLParser
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
+
 _PRE_RE = re.compile(r"<pre[^>]*>(.*?)</pre>", re.IGNORECASE | re.DOTALL)
+
+
+def entry_config(entry: ConfigEntry) -> dict[str, Any]:
+    """Return the effective configuration for a config entry."""
+    return {**entry.data, **entry.options}
 
 
 class _TextExtractor(HTMLParser):

@@ -24,6 +24,7 @@ from .const import (
 )
 from .coordinator import AlexaMaSkillCoordinator
 from .supervisor import AlexaMaSkillSupervisor
+from .util import entry_config
 
 
 @dataclass(slots=True)
@@ -37,16 +38,17 @@ class AlexaMaSkillRuntimeData:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Alexa MA Skill from a config entry."""
-    base_url = entry.data.get(CONF_BASE_URL) or DEFAULT_BASE_URL
-    username = str(entry.data.get(CONF_USERNAME) or "")
-    password = str(entry.data.get(CONF_PASSWORD) or "")
+    config = entry_config(entry)
+    base_url = config.get(CONF_BASE_URL) or DEFAULT_BASE_URL
+    username = str(config.get(CONF_USERNAME) or "")
+    password = str(config.get(CONF_PASSWORD) or "")
     if not username or not password:
         raise ConfigEntryNotReady(
             "Missing add-on credentials; reconfigure the Alexa MA Skill integration"
         )
 
     try:
-        scan_interval = int(entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+        scan_interval = int(config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
     except (TypeError, ValueError):
         scan_interval = DEFAULT_SCAN_INTERVAL
     scan_interval = max(MIN_SCAN_INTERVAL, min(MAX_SCAN_INTERVAL, scan_interval))
@@ -56,7 +58,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         base_url,
         username,
         password,
-        ignore_https=bool(entry.data.get(CONF_IGNORE_HTTPS, False)),
+        ignore_https=bool(config.get(CONF_IGNORE_HTTPS, False)),
     )
     supervisor = AlexaMaSkillSupervisor(hass)
     coordinator = AlexaMaSkillCoordinator(hass, api, scan_interval=scan_interval)
