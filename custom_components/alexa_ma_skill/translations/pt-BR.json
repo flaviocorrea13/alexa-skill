@@ -30,6 +30,13 @@
           "ignore_https": "Ignora a verificação de certificado no teste de conectividade. Use apenas para hairpin NAT ou endpoints de teste com certificado autoassinado."
         }
       },
+      "addon_select": {
+        "title": "Selecionar o add-on",
+        "description": "Mais de um add-on corresponde ao slug base do Alexa MA Skill. Selecione qual a integração deve gerenciar.",
+        "data": {
+          "addon_slug": "Add-on"
+        }
+      },
       "manual": {
         "title": "Configuração manual",
         "description": "Use a URL interna de um contêiner gerenciado externamente. O login na Amazon é sempre manual.",
@@ -95,6 +102,8 @@
       "invalid_auth": "Usuário ou senha inválidos.",
       "cannot_connect": "Não foi possível conectar ao add-on. Verifique se ele está rodando e se a URL interna está correta.",
       "addon_not_installed": "O add-on Alexa MA Skill não está instalado. Instale-o pela loja de add-ons.",
+      "invalid_addon_slug": "Selecione um dos add-ons Alexa MA Skill encontrados.",
+      "addon_selection_required": "Mais de um add-on Alexa MA Skill foi encontrado. Selecione um nas opções da integração.",
       "addon_options_invalid": "As opções gravadas no add-on não puderam ser validadas. Verifique as opções do add-on.",
       "addon_start_timeout": "O add-on não respondeu em até 90 segundos. Verifique os logs do add-on e tente novamente.",
       "ma_api_incomplete": "Informe MA_API_URL e MA_API_TOKEN juntos, ou deixe os dois em branco."
@@ -119,6 +128,7 @@
           "enable_apl": "Habilitar APL",
           "skip_url_validation": "Pular validação da URL de áudio",
           "skill_id": "ID da skill (avançado)",
+          "addon_slug": "Add-on",
           "ma_api_url": "URL da API do Music Assistant (avançado)",
           "ma_api_token": "Token da API do Music Assistant (deixe em branco para manter o atual)",
           "scan_interval": "Intervalo de atualização (segundos)",
@@ -134,6 +144,7 @@
           "enable_apl": "Habilita Alexa Presentation Language em dispositivos com tela.",
           "skip_url_validation": "Não valida a URL do stream do Music Assistant antes de enviá-la à Alexa.",
           "skill_id": "ID retornado pelo setup, usado para restringir as requisições a esta skill. Deixe em branco para usar o valor detectado quando disponível.",
+          "addon_slug": "Slug do add-on no Supervisor a gerenciar. Exibido quando há mais de um correspondente.",
           "ma_api_url": "URL base da API WebSocket do Music Assistant na porta 8095. Não é a porta de stream 8097.",
           "ma_api_token": "Deixe em branco para manter o token atual. Limpe MA_API_URL para remover os dois.",
           "scan_interval": "Intervalo do status barato, de 10 a 300 segundos. A checagem detalhada do ASK continua em cerca de 5 minutos.",
@@ -148,6 +159,7 @@
       "invalid_auth": "Usuário ou senha inválidos.",
       "cannot_connect": "Não foi possível conectar ao add-on. Verifique se ele está rodando e se a URL interna está correta.",
       "addon_not_installed": "O add-on Alexa MA Skill não está instalado. Instale-o pela loja de add-ons.",
+      "addon_selection_required": "Mais de um add-on Alexa MA Skill foi encontrado. Selecione um para gerenciar.",
       "addon_options_invalid": "As opções gravadas no add-on não puderam ser validadas. Verifique as opções do add-on.",
       "addon_start_timeout": "O add-on não respondeu em até 90 segundos. Verifique os logs do add-on e tente novamente.",
       "ma_api_incomplete": "Informe MA_API_URL e MA_API_TOKEN juntos, ou deixe os dois em branco."

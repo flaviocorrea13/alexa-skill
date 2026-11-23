@@ -108,7 +108,7 @@ class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
             raise UpdateFailed(f"Unexpected response from the add-on: {err}") from err
 
         container_online = simple.reachable
-        if self._supervisor is not None and self._supervisor.available:
+        if self._supervisor is not None and self._supervisor.manager_ready:
             try:
                 (
                     container_online,

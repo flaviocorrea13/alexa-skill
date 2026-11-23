@@ -50,8 +50,9 @@ Planejada, ainda não implementada:
 - Fica em `custom_components/alexa_ma_skill/`.
 - Configura o add-on pela UI do Home Assistant (config flow).
 - Gera credenciais e grava as opções do add-on via Supervisor.
-- Consulta o serviço interno do add-on em `http://alexa-ma-skill:5000` (DNS
-  interno do add-on).
+- Consulta o serviço interno do add-on no hostname derivado do slug do
+  Supervisor, trocando `_` por `-`: `http://<slug-com-hifens>:5000` (por
+  exemplo `0cc21073-alexa-ma-skill`).
 - A URL voltada ao usuário para o setup é
   `https://<SKILL_HOSTNAME>/setup`.
 - Deve ser compatível com HACS e ter `manifest.json` completo.
@@ -284,7 +285,8 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 - **Usar os helpers do componente `hassio` em vez de HTTP cru no Supervisor**
   e declarar a dependência no `manifest.json`.
 - Garantir compatibilidade HACS (`hacs.json` já existe na raiz).
-- Consultar o add-on em `http://alexa-ma-skill:5000`.
+- Consultar o add-on no hostname derivado do slug do Supervisor, por exemplo
+  `http://0cc21073-alexa-ma-skill:5000`.
 - A URL de setup para o usuário é `https://<SKILL_HOSTNAME>/setup`.
 
 ### 7.2 Fase 3 — setup assistido
@@ -435,8 +437,10 @@ acima servem de referência.
 Leitura das credenciais geradas (HA OS com acesso ao host):
 
 ```sh
-docker exec addon_alexa_ma_skill cat /data/generated_app_username
-docker exec addon_alexa_ma_skill cat /data/generated_app_password
+# Substitua <slug> pelo slug real do Supervisor, por exemplo
+# 0cc21073_alexa_ma_skill.
+docker exec addon_<slug> cat /data/generated_app_username
+docker exec addon_<slug> cat /data/generated_app_password
 ```
 
 ## 11. Referências upstream
@@ -513,3 +517,21 @@ itens abaixo são fatos observados e não devem ser revertidos sem novo teste.
   logs.
 - O melhor indicador é a página `/status` (recent invocations) ou
   `/invocations`.
+
+### 12.7 Slug de add-on de repositório personalizado
+
+- Add-ons instalados de um repositório personalizado recebem um prefixo
+  `<hash>_` do Supervisor. O slug real pode ser
+  `0cc21073_alexa_ma_skill`, e não `alexa_ma_skill`.
+- A integração **não** deve fixar o hash nem o slug completo:
+  - lista os add-ons com `get_addons_info(hass)` do componente `hassio`;
+  - aceita slug igual a `alexa_ma_skill` ou terminado em `_alexa_ma_skill`;
+  - se houver mais de um, mostra um seletor;
+  - persiste o slug escolhido em `CONF_ADDON_SLUG` na config entry;
+  - usa esse slug em todas as chamadas do `AddonManager` (`info`, `options`,
+    `start`, `restart`, `stop`).
+- O hostname interno é derivado do slug trocando `_` por `-`:
+  `0cc21073_alexa_ma_skill` → `0cc21073-alexa-ma-skill`. O valor fixo
+  `alexa-ma-skill` não deve ser usado no modo gerenciado.
+- Se nenhum add-on for encontrado, logar em `debug` a lista de slugs
+  encontrados e mostrar a mensagem de add-on não instalado.

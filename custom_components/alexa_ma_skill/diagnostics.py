@@ -119,7 +119,7 @@ async def async_get_config_entry_diagnostics(
 
     if runtime is not None:
         supervisor = runtime.supervisor
-        if supervisor.available:
+        if supervisor.manager_ready:
             try:
                 info = await supervisor.async_get_info()
             except (

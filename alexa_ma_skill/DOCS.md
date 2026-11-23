@@ -45,6 +45,31 @@ https://MA_HOSTNAME  --->  túnel/reverse proxy  --->  Music Assistant :8097
 - O add-on **não cria túneis, não gerencia certificados e não abre portas no
   roteador**. Você é responsável pela exposição HTTPS pública.
 
+## Slug e hostname interno do add-on
+
+Add-ons instalados de um repositório personalizado recebem um prefixo
+`<hash>_` do Supervisor. Por isso, o slug real pode ser
+`0cc21073_alexa_ma_skill` em vez de `alexa_ma_skill`.
+
+A integração personalizada:
+
+- lista os add-ons com `get_addons_info(hass)` do componente `hassio`;
+- aceita o slug exato `alexa_ma_skill` ou qualquer slug terminado em
+  `_alexa_ma_skill`;
+- mostra um seletor quando há mais de um correspondente;
+- guarda o slug escolhido na config entry e o usa em todas as chamadas ao
+  Supervisor.
+
+O hostname interno é derivado do slug trocando `_` por `-`. Exemplos:
+
+| Slug no Supervisor | Hostname interno |
+|---|---|
+| `alexa_ma_skill` | `alexa-ma-skill` |
+| `0cc21073_alexa_ma_skill` | `0cc21073-alexa-ma-skill` |
+
+Use o hostname derivado ao acessar o add-on a partir de outro contêiner ou em
+configurações manuais. A porta interna continua sendo `5000`.
+
 ## Requisitos
 
 - Home Assistant OS ou Home Assistant Supervised, com add-ons habilitados.
@@ -146,15 +171,17 @@ Para ler os valores gerados, use o add-on **Terminal & SSH** com acesso ao
 host:
 
 ```sh
-docker exec addon_alexa_ma_skill cat /data/generated_app_username
-docker exec addon_alexa_ma_skill cat /data/generated_app_password
+# Substitua <slug> pelo slug real do Supervisor, por exemplo
+# 0cc21073_alexa_ma_skill.
+docker exec addon_<slug> cat /data/generated_app_username
+docker exec addon_<slug> cat /data/generated_app_password
 ```
 
 Ou, no Home Assistant OS:
 
 ```sh
-sudo cat /mnt/data/supervisor/addons/data/alexa_ma_skill/generated_app_username
-sudo cat /mnt/data/supervisor/addons/data/alexa_ma_skill/generated_app_password
+sudo cat /mnt/data/supervisor/addons/data/<slug>/generated_app_username
+sudo cat /mnt/data/supervisor/addons/data/<slug>/generated_app_password
 ```
 
 Se preferir não usar SSH, defina `APP_USERNAME` e `APP_PASSWORD` você mesmo
@@ -385,6 +412,16 @@ Não faça chamadas públicas a `/status`.
   `https://`, sem caminho e sem porta.
 - Confirme que `PORT` é `5000`.
 - Confirme que `LOCALE` é um dos valores aceitos.
+
+### A integração diz que o add-on não está instalado
+
+- Add-ons de repositório personalizado têm slug com prefixo `<hash>_`, por
+  exemplo `0cc21073_alexa_ma_skill`.
+- A integração procura `alexa_ma_skill` ou `*_alexa_ma_skill` e guarda o slug
+  encontrado. Se houver mais de um, ela mostra um seletor.
+- Verifique no Supervisor qual é o slug real e reinicie a integração.
+- O hostname interno é o slug com `_` trocado por `-`, por exemplo
+  `0cc21073-alexa-ma-skill`.
 
 ### Recebo 401 em `/setup` ou `/status`
 

@@ -42,6 +42,7 @@ from .const import (
     ADDON_START_POLL_INTERVAL,
     ADDON_START_TIMEOUT,
     ALLOWED_LOCALES,
+    CONF_ADDON_SLUG,
     CONF_BASE_URL,
     CONF_ENABLE_APL,
     CONF_IGNORE_HTTPS,
@@ -57,7 +58,6 @@ from .const import (
     CONF_SKIP_URL_VALIDATION,
     CONF_USERNAME,
     DEFAULT_BASE_URL,
-    DEFAULT_HOST,
     DEFAULT_LOCALE,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
@@ -67,9 +67,11 @@ from .const import (
     NAME,
 )
 from .supervisor import (
+    AddonCandidate,
     AlexaMaSkillSupervisor,
     SupervisorOperationError,
     SupervisorUnavailableError,
+    addon_hostname,
 )
 from .util import entry_config
 
@@ -241,6 +243,21 @@ def _scan_interval_selector() -> NumberSelector:
     )
 
 
+def _addon_selector(candidates: list[AddonCandidate]) -> SelectSelector:
+    """Return a selector for the matching add-on slugs."""
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=[
+                SelectOptionDict(
+                    value=candidate.slug,
+                    label=f"{candidate.name} ({candidate.slug})",
+                )
+                for candidate in candidates
+            ]
+        )
+    )
+
+
 class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the Alexa MA Skill config flow."""
 
@@ -250,6 +267,25 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the flow."""
         self._pending_data: dict[str, Any] = {}
         self._reauth_entry: ConfigEntry | None = None
+        self._addon_candidates: list[AddonCandidate] = []
+        self._addon_slug: str = ""
+
+    def _resolve_addon(self, preferred_slug: str = "") -> list[AddonCandidate]:
+        """Discover matching add-ons and select one when unambiguous."""
+        supervisor = AlexaMaSkillSupervisor(self.hass)
+        candidates = supervisor.discover_addons()
+        self._addon_candidates = candidates
+        if not candidates:
+            self._addon_slug = ""
+        elif preferred_slug and any(
+            candidate.slug == preferred_slug for candidate in candidates
+        ):
+            self._addon_slug = preferred_slug
+        elif len(candidates) == 1:
+            self._addon_slug = candidates[0].slug
+        else:
+            self._addon_slug = ""
+        return candidates
 
     @staticmethod
     @callback
@@ -316,6 +352,22 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Configure the managed add-on."""
         schema = self._addon_schema(user_input)
+        try:
+            candidates = self._resolve_addon(self._addon_slug)
+        except (SupervisorOperationError, SupervisorUnavailableError):
+            return self.async_show_form(
+                step_id="addon",
+                data_schema=schema,
+                errors={"base": "cannot_connect"},
+            )
+        if not candidates:
+            return self.async_show_form(
+                step_id="addon",
+                data_schema=schema,
+                errors={"base": "addon_not_installed"},
+            )
+        if not self._addon_slug:
+            return await self.async_step_addon_select()
         if user_input is None:
             return self.async_show_form(step_id="addon", data_schema=schema)
 
@@ -334,6 +386,10 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ignore_https = bool(user_input.get(CONF_IGNORE_HTTPS, False))
 
             supervisor = AlexaMaSkillSupervisor(self.hass)
+            try:
+                supervisor.select_addon(self._addon_slug)
+            except SupervisorOperationError as err:
+                raise _FlowError("cannot_connect") from err
             try:
                 if not await supervisor.async_is_installed():
                     raise _FlowError("addon_not_installed")
@@ -363,7 +419,10 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 raise _FlowError("addon_options_invalid") from err
             _validate_addon_options(updated_info.options, addon_options)
 
-            base_url = f"http://{updated_info.hostname or DEFAULT_HOST}:{DEFAULT_PORT}"
+            base_url = (
+                f"http://{updated_info.hostname or addon_hostname(self._addon_slug)}"
+                f":{DEFAULT_PORT}"
+            )
             api = AlexaMaSkillApi(
                 self.hass,
                 base_url,
@@ -383,6 +442,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             self._pending_data = {
                 CONF_MANAGED: True,
+                CONF_ADDON_SLUG: self._addon_slug,
                 CONF_BASE_URL: base_url,
                 CONF_USERNAME: username,
                 CONF_PASSWORD: password,
@@ -415,6 +475,34 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=schema,
                 errors={"base": "cannot_connect"},
             )
+
+    async def async_step_addon_select(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Select which matching add-on should be managed."""
+        if not self._addon_candidates:
+            return await self.async_step_addon()
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            selected = str(user_input.get(CONF_ADDON_SLUG) or "")
+            if any(candidate.slug == selected for candidate in self._addon_candidates):
+                self._addon_slug = selected
+                return await self.async_step_addon()
+            errors["base"] = "invalid_addon_slug"
+
+        default = self._addon_slug or self._addon_candidates[0].slug
+        return self.async_show_form(
+            step_id="addon_select",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_ADDON_SLUG, default=default): _addon_selector(
+                        self._addon_candidates
+                    )
+                }
+            ),
+            errors=errors,
+        )
 
     def _manual_schema(self, defaults: Mapping[str, Any] | None = None) -> vol.Schema:
         """Return the manual mode schema."""
@@ -511,6 +599,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             data = {
                 CONF_MANAGED: False,
+                CONF_ADDON_SLUG: "",
                 CONF_BASE_URL: base_url,
                 CONF_USERNAME: username,
                 CONF_PASSWORD: password,
@@ -699,7 +788,28 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, entry: ConfigEntry, config: Mapping[str, Any]
     ) -> None:
         """Re-read credentials from the managed add-on."""
+        preferred_slug = str(config.get(CONF_ADDON_SLUG) or "").strip()
         supervisor = AlexaMaSkillSupervisor(self.hass)
+        try:
+            candidates = supervisor.discover_addons()
+        except (SupervisorOperationError, SupervisorUnavailableError) as err:
+            raise _FlowError("cannot_connect") from err
+        if not candidates:
+            raise _FlowError("addon_not_installed")
+        if preferred_slug and any(
+            candidate.slug == preferred_slug for candidate in candidates
+        ):
+            addon_slug = preferred_slug
+        elif len(candidates) == 1:
+            addon_slug = candidates[0].slug
+        else:
+            raise _FlowError("addon_selection_required")
+
+        supervisor = AlexaMaSkillSupervisor(self.hass)
+        try:
+            supervisor.select_addon(addon_slug)
+        except SupervisorOperationError as err:
+            raise _FlowError("cannot_connect") from err
         try:
             if not await supervisor.async_is_installed():
                 raise _FlowError("addon_not_installed")
@@ -717,7 +827,9 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         ):
             raise _FlowError("addon_options_invalid")
 
-        base_url = f"http://{info.hostname or DEFAULT_HOST}:{DEFAULT_PORT}"
+        base_url = (
+            f"http://{info.hostname or addon_hostname(addon_slug)}:{DEFAULT_PORT}"
+        )
         api = AlexaMaSkillApi(
             self.hass,
             base_url,
@@ -735,6 +847,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         await self._async_update_entry(
             entry,
             {
+                CONF_ADDON_SLUG: addon_slug,
                 CONF_BASE_URL: base_url,
                 CONF_USERNAME: username,
                 CONF_PASSWORD: password,
@@ -755,6 +868,22 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
     """Handle options for an existing entry."""
 
+    def _discover_addons(
+        self, config: Mapping[str, Any]
+    ) -> tuple[list[AddonCandidate], str]:
+        """Return matching add-ons and the currently selected slug."""
+        if not bool(config.get(CONF_MANAGED, False)):
+            return [], ""
+        candidates = AlexaMaSkillSupervisor(self.hass).discover_addons()
+        stored_slug = str(config.get(CONF_ADDON_SLUG) or "").strip()
+        if stored_slug and any(
+            candidate.slug == stored_slug for candidate in candidates
+        ):
+            return candidates, stored_slug
+        if len(candidates) == 1:
+            return candidates, candidates[0].slug
+        return candidates, ""
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -766,11 +895,17 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
         runtime = self.hass.data.get(DOMAIN, {}).get(entry.entry_id)
         if runtime is not None and runtime.coordinator.data is not None:
             suggested_skill_id = runtime.coordinator.data.suggested_skill_id or ""
+        try:
+            addon_candidates, selected_addon_slug = self._discover_addons(config)
+        except (SupervisorOperationError, SupervisorUnavailableError):
+            addon_candidates, selected_addon_slug = [], ""
         schema = self._options_schema(
             config,
             managed,
             user_input,
             suggested_skill_id=suggested_skill_id,
+            addon_candidates=addon_candidates,
+            selected_addon_slug=selected_addon_slug,
         )
         if user_input is None:
             return self.async_show_form(step_id="init", data_schema=schema)
@@ -810,6 +945,29 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
             )
             ignore_https = bool(user_input.get(CONF_IGNORE_HTTPS, False))
 
+            addon_slug = ""
+            if managed:
+                try:
+                    candidates = AlexaMaSkillSupervisor(self.hass).discover_addons()
+                except (
+                    SupervisorOperationError,
+                    SupervisorUnavailableError,
+                ) as err:
+                    raise _FlowError("cannot_connect") from err
+                if not candidates:
+                    raise _FlowError("addon_not_installed")
+                requested_slug = str(
+                    user_input.get(CONF_ADDON_SLUG) or config.get(CONF_ADDON_SLUG) or ""
+                ).strip()
+                if requested_slug and any(
+                    candidate.slug == requested_slug for candidate in candidates
+                ):
+                    addon_slug = requested_slug
+                elif len(candidates) == 1:
+                    addon_slug = candidates[0].slug
+                else:
+                    raise _FlowError("addon_selection_required")
+
             base_url = (
                 _clean_base_url(user_input.get(CONF_BASE_URL))
                 if not managed
@@ -818,6 +976,10 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
 
             if managed:
                 supervisor = AlexaMaSkillSupervisor(self.hass)
+                try:
+                    supervisor.select_addon(addon_slug)
+                except SupervisorOperationError as err:
+                    raise _FlowError("cannot_connect") from err
                 try:
                     if not await supervisor.async_is_installed():
                         raise _FlowError("addon_not_installed")
@@ -828,7 +990,10 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                 ) as err:
                     raise _FlowError("cannot_connect") from err
 
-                base_url = f"http://{info.hostname or DEFAULT_HOST}:{DEFAULT_PORT}"
+                base_url = (
+                    f"http://{info.hostname or addon_hostname(addon_slug)}"
+                    f":{DEFAULT_PORT}"
+                )
                 addon_options = {
                     "SKILL_HOSTNAME": skill_hostname,
                     "MA_HOSTNAME": ma_hostname,
@@ -903,6 +1068,7 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
 
             new_config = {
                 CONF_MANAGED: managed,
+                CONF_ADDON_SLUG: addon_slug,
                 CONF_BASE_URL: base_url,
                 CONF_USERNAME: username,
                 CONF_PASSWORD: password,
@@ -943,6 +1109,8 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
         defaults: Mapping[str, Any] | None = None,
         *,
         suggested_skill_id: str = "",
+        addon_candidates: list[AddonCandidate] | None = None,
+        selected_addon_slug: str = "",
     ) -> vol.Schema:
         """Return the options schema."""
         defaults = defaults or {}
@@ -1022,6 +1190,16 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                 ),
             ): BooleanSelector(),
         }
+        if managed and addon_candidates and len(addon_candidates) > 1:
+            fields[
+                vol.Required(
+                    CONF_ADDON_SLUG,
+                    default=defaults.get(
+                        CONF_ADDON_SLUG,
+                        selected_addon_slug or addon_candidates[0].slug,
+                    ),
+                )
+            ] = _addon_selector(addon_candidates)
         if not managed:
             fields[
                 vol.Required(

@@ -14,6 +14,7 @@ ADDON_NAME = "Alexa MA Skill"
 ADDON_SLUG = "alexa_ma_skill"
 
 CONF_MANAGED = "managed"
+CONF_ADDON_SLUG = "addon_slug"
 CONF_BASE_URL = "base_url"
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
