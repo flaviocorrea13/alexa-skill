@@ -18,8 +18,8 @@ import os
 import secrets
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 DATA_DIR = Path("/data")
 USERNAME_FILE = DATA_DIR / "generated_app_username"
@@ -268,8 +268,7 @@ def _clean_hostname(key: str, value: object, *, required: bool) -> str:
         raise ConfigError(
             f"{key} must be a bare hostname, without http:// or https://."
         )
-    if text.endswith("."):
-        text = text[:-1]
+    text = text.removesuffix(".")
     if any(character in text for character in "/?#@\\ \t\r\n"):
         raise ConfigError(
             f"{key} must be a bare hostname without paths, ports, query "
@@ -303,9 +302,7 @@ def _validate_port(value: object) -> str:
 def _validate_locale(value: object) -> str:
     text = _as_text(value).strip() or DEFAULT_LOCALE
     if text not in ALLOWED_LOCALES:
-        raise ConfigError(
-            "LOCALE must be one of: " + ", ".join(ALLOWED_LOCALES) + "."
-        )
+        raise ConfigError("LOCALE must be one of: " + ", ".join(ALLOWED_LOCALES) + ".")
     return text
 
 
@@ -379,13 +376,15 @@ def _write_env_export(path: Path, options: dict[str, str]) -> None:
     records = bytearray()
     for key in RUNTIME_KEYS:
         value = options.get(key, "")
-        records.extend(f"{key}={value}".encode("utf-8"))
+        records.extend(f"{key}={value}".encode())
         records.append(0)
     try:
         path.write_bytes(bytes(records))
         os.chmod(path, 0o600)
     except OSError as exc:
-        raise ConfigError(f"Could not write the environment export file: {exc}") from exc
+        raise ConfigError(
+            f"Could not write the environment export file: {exc}"
+        ) from exc
 
 
 def main(argv: list[str]) -> int:
