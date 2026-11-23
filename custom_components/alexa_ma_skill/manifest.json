@@ -1,0 +1,12 @@
+{
+  "domain": "alexa_ma_skill",
+  "name": "Alexa MA Skill",
+  "codeowners": ["@flaviocorrea13"],
+  "config_flow": true,
+  "documentation": "https://github.com/flaviocorrea13/alexa-ma-skill",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/flaviocorrea13/alexa-ma-skill/issues",
+  "version": "0.1.0",
+  "after_dependencies": ["hassio"]
+}
