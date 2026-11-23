@@ -2,6 +2,10 @@
 # for amd64 and aarch64. Do not replace it with :latest.
 FROM ghcr.io/alams154/music-assistant-skill:0.0.39-beta@sha256:b1ef33ad0b05b7e0a315535e8141177898be4b6a0401decf43dedf424f0d90f1
 
+LABEL org.opencontainers.image.title="Alexa MA Skill"
+LABEL org.opencontainers.image.source="https://github.com/flaviocorrea13/alexa-skill"
+LABEL org.opencontainers.image.url="https://github.com/flaviocorrea13/alexa-skill"
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 # The upstream image does not include the timezone database. TZ is exposed as

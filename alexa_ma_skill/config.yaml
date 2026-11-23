@@ -1,5 +1,5 @@
 name: Alexa MA Skill
-version: "0.1.0"
+version: "0.1.1"
 slug: alexa_ma_skill
 description: >-
   Executa a skill Alexa do Music Assistant com credenciais persistentes,

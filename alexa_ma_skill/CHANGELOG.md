@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 - 2026-11-23
+
+- Corrige a URL do repositório para
+  `https://github.com/flaviocorrea13/alexa-skill`.
+
 ## 0.1.0 - 2026-11-22
 
 - Versão inicial da Fase 1 do add-on.
