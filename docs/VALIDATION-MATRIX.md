@@ -9,12 +9,28 @@ conta Amazon.
 Esta matriz separa o que foi realmente executado do que depende de ambiente
 externo. Testes unitários **não** equivalem a validação ponta a ponta.
 
-> **Nota sobre a execução no Windows:** a suíte `pytest` completa rodou no
-> Windows com dois shims locais mantidos **fora do repositório** (`fcntl` e
-> `resource`, além de sockets habilitados para o event loop do Windows). Isso
-> permitiu executar os testes de config flow e a suíte inteira, mas **não
-> substitui** a execução oficial em Linux/CI. O projeto continua sem suporte
-> oficial a Windows para o harness do Home Assistant.
+> **Nota sobre a execução no Windows:** a suíte `pytest` também foi executada
+> no Windows com shims locais mantidos **fora do repositório** (`fcntl` e
+> `resource`, além de sockets habilitados para o event loop). Isso serviu como
+> verificação suplementar; a execução oficial em Linux foi concluída no CI.
+> O projeto continua sem suporte oficial a Windows para o harness do Home
+> Assistant.
+
+## 0. CI remoto — GitHub Actions
+
+| Item | Valor |
+|---|---|
+| Run | [45276992158](https://github.com/flaviocorrea13/alexa-skill/actions/runs/45276992158) |
+| Commit | `ee16d8b32f442afa40cb598a4d5fee64cec647c1` |
+| Evento | `pull_request` (PR #1, Draft) |
+| Resultado geral | **success** |
+
+| Job | Resultado |
+|---|---|
+| Repository and add-on validation | **Sucesso** |
+| Integration tests (Home Assistant harness) | **Sucesso** — 56 testes, 26 subtestes, Linux/Python 3.14.10/HA 2026.10.4 |
+| Hassfest | **Sucesso** |
+| HACS validation | **Sucesso** |
 
 ## 1. Testes automatizados locais
 
@@ -34,20 +50,20 @@ externo. Testes unitários **não** equivalem a validação ponta a ponta.
 
 | Componente | Versão | Ambiente | Procedimento | Resultado | Evidência | Pendência |
 |---|---|---|---|---|---|---|
-| **Config flow (6 testes)** | `0.2.0` (worktree) | Windows 11 + harness HA + shim local | `.venv\Scripts\python.exe -m pytest tests\test_config_flow.py -q -p winsocket` | **6 testes OK** | saída do pytest em 23/11/2026 | Execução oficial em Linux pendente |
-| Options flow / setup assistido | `0.2.0` (worktree) | Linux + harness HA | `python -m pytest -q` | **NÃO EXECUTADO** | cobertura indireta por 34 testes de helpers e pelo formulário simulado | Sem teste de UI real no harness |
-| Ciclo de vida (load/unload/reload) | `0.2.0` (worktree) | Linux + harness HA + HA OS | CI / HA OS | **NÃO EXECUTADO** | revisão de código apenas | Depende do CI e de uma instalação real |
+| **Config flow (6 testes)** | `0.2.0` | Linux + harness HA no CI; Windows com shim como verificação suplementar | `python -m pytest -q` no job `integration` | **6 testes OK no CI Linux** | run 45276992158 | — |
+| Options flow / setup assistido | `0.2.0` | Linux + harness HA | `python -m pytest -q` | **PARCIAL** | cobertura indireta por testes de helpers e pelo formulário simulado; options flow completo não tem teste dedicado | Adicionar teste de options flow no harness |
+| Ciclo de vida (load/unload/reload) | `0.2.0` | Linux + harness HA + HA OS | CI / HA OS | **NÃO EXECUTADO** | revisão de código apenas | Depende de HA OS |
 
 ## 3. CI, Hassfest e HACS
 
 | Verificação | Ferramenta | Estado | Evidência | Pendência |
 |---|---|---|---|---|
-| Workflow de CI | `.github/workflows/ci.yml` | **AUDITADO E CORRIGIDO, NÃO EXECUTADO** | actionlint `1.7.12` passou (0 erros); actions fixadas por SHA, HACS `ignore` com separador correto, `comment: "false"`, dependabot | Primeira execução depende de push/PR (não autorizado) |
-| Auditoria estática do Hassfest | Código do Hassfest (`2026.10.4`) | **CONCLUÍDO** | corrigidos: ordem das chaves do `manifest.json` e URLs em strings de tradução | Não substitui a execução oficial |
-| **Hassfest (plugins oficiais)** | HA Core `2026.10.4`, `scripts/run_hassfest_subset.py` | **PARCIAL — 0 erros** | 10 plugins: `json`, `manifest`, `translations`, `services`, `icons`, `integration_type`, `config_schema`, `codeowners`, `requirements`, `config_flow`; 1 integração, 0 erros | Execução oficial via Docker/CI e plugin `dependencies` pendentes |
-| Hassfest oficial | `ghcr.io/home-assistant/hassfest` | **BLOQUEADO** | exige Docker/Linux; não há Docker nem WSL nesta máquina | Executar no GitHub Actions |
-| Auditoria estática do HACS | Schemas/documentação oficiais | **CONCLUÍDO** | `hacs.json` sem chaves extras, manifesto com chaves exigidas, uma única integração; corrigido separador do `ignore` | `brand/icon.png` ausente; release ausente para catálogo padrão |
-| HACS Action oficial | `hacs/action` | **BLOQUEADO** | requer Docker e valida o repositório **remoto** | Depende de push autorizado e Docker/CI |
+| Workflow de CI | `.github/workflows/ci.yml` | **EXECUTADO — SUCESSO** | run 45276992158 no commit `ee16d8b`; 4 jobs aprovados; actionlint também passou | Reexecutar após as correções de aviso |
+| Auditoria estática do Hassfest | Código do Hassfest (`2026.10.4`) | **CONCLUÍDO** | ordem do manifesto e URLs em traduções corrigidas | — |
+| **Hassfest (plugins oficiais)** | HA Core `2026.10.4`, `scripts/run_hassfest_subset.py` | **PARCIAL — 0 erros** | 10 plugins, 1 integração, 0 erros | — |
+| Hassfest oficial | `ghcr.io/home-assistant/hassfest` | **EXECUTADO — SUCESSO** | job `hassfest` do run 45276992158 | — |
+| Auditoria estática do HACS | Schemas/documentação oficiais | **CONCLUÍDO** | `hacs.json`/manifesto conformes; `ignore` corrigido | `brand/icon.png` e release para catálogo padrão |
+| HACS Action oficial | `hacs/action` | **EXECUTADO — SUCESSO** | job `hacs` do run 45276992158, com ignores de metadados do GitHub | Catálogo padrão exige Action sem ignores, brand e release |
 | Build do add-on | Docker/Supervisor | **NÃO EXECUTADO** | — | Sem Docker no ambiente local; o build real ocorre no HA OS |
 | Build multi-arquitetura | CI/Supervisor | **NÃO EXECUTADO** | — | `aarch64` não testado em execução |
 | Artefato upstream (tag + digest) | GHCR | **VERIFICADO** | consulta read-only em 23/11/2026: HTTP 200, digest `sha256:b1ef33ad0b05b7e0a315535e8141177898be4b6a0401decf43dedf424f0d90f1`, índice OCI com `linux/amd64` e `linux/arm64` | O digest confere com o `FROM`; build e execução locais não foram feitos |
@@ -85,7 +101,7 @@ Evidências registradas em `AGENTS.md` a partir de uma instalação real anterio
 | Home Assistant mínimo | `2026.10.4` (`hacs.json`) | Bibliotecas 2026.10.x no ambiente de desenvolvimento; HA OS real em versão não registrada | **PARCIAL** — declarar apenas como versão de desenvolvimento até teste em HA OS |
 | Music Assistant | sem versão mínima declarada | Integração real observada, versão não registrada | **PENDENTE** — não há versão mínima comprovada |
 | Add-on | `0.2.0` candidata | `0.1.1` em uso real; `0.2.0` não instalada | **PENDENTE** — validar a candidata em HA OS |
-| Integração | `0.2.0` candidata | 34 helpers + 6 config flow (Windows com shims) | **PARCIAL** — falta Linux/Hassfest/HACS/HA OS |
+| Integração | `0.2.0` candidata | 56 testes no CI Linux (inclui 6 config flow) + 10 plugins Hassfest | **PARCIAL** — falta HA OS e options flow dedicado |
 | Arquiteturas | `amd64`, `aarch64` (`config.yaml`) | `amd64` com evidência real; índice OCI contém `amd64` e `arm64`; `aarch64` sem execução | **PARCIAL** — não declarar `aarch64` como validada |
 
 ### Arquiteturas em níveis

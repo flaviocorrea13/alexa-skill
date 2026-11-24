@@ -92,8 +92,10 @@ class AlexaMaSkillApi:
         """Initialize the client."""
         self._session = session or async_get_clientsession(hass)
         self._base_url = base_url.rstrip("/")
-        self._auth = (
-            aiohttp.BasicAuth(username, password) if username or password else None
+        self._auth_header = (
+            aiohttp.encode_basic_auth(username, password, "latin1")
+            if username or password
+            else None
         )
         self._ignore_https = ignore_https
 
@@ -202,9 +204,11 @@ class AlexaMaSkillApi:
     ) -> tuple[str, int]:
         """Perform a request and translate failures into API errors."""
         url = f"{self._base_url}{path}"
+        headers = {"Accept": accept}
+        if self._auth_header is not None:
+            headers["Authorization"] = self._auth_header
         kwargs: dict[str, Any] = {
-            "auth": self._auth,
-            "headers": {"Accept": accept},
+            "headers": headers,
             "timeout": aiohttp.ClientTimeout(total=timeout),
         }
         if json_data is not None:

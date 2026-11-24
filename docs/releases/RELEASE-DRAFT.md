@@ -105,12 +105,12 @@ checklist de 16 etapas.
 
 ## Pendências de validação antes da publicação
 
-- Primeira execução da CI em pull request.
-- Hassfest oficial aprovado.
-- HACS Action aprovada.
-- `pytest` oficial no Linux (a execução local no Windows com shims foi
-  suplementar e passou).
+- CI, Hassfest e HACS Action: **aprovados** no run 45276992158 (commit
+  `ee16d8b`).
+- `pytest` Linux: **56 testes e 26 subtestes aprovados** no CI.
 - Instalação da `0.2.0` em HA OS `amd64` e, se possível, `aarch64`.
+- Teste ponta a ponta com Alexa e Music Assistant na `0.2.0`.
+- Backup/restauração.
 - `brand/icon.png` e uma Release completa para o catálogo padrão do HACS.
 - Captura das screenshots reais sem dados sensíveis.
 - Revisão final de segurança e de links.

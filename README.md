@@ -10,9 +10,11 @@ CLI entre reinícios, gera senhas fortes quando necessário e expõe uma página
 setup e diagnóstico na rede local. Uma integração personalizada **opcional**
 adiciona configuração pela interface e um checklist de configuração de 16 etapas.
 
-> **Estado atual:** repositório em preparação para a primeira distribuição. O
-> add-on tem evidência real de uso em Home Assistant OS `amd64`; a integração, o
-> `aarch64`, o Hassfest e a CI ainda não foram validados em execução. Leia a
+> **Estado atual:** repositório em preparação para a primeira distribuição. Os
+> quatro jobs do CI (repositório/add-on, integração, Hassfest e HACS) passaram
+> no commit `ee16d8b`. O add-on tem evidência real de uso em Home Assistant OS
+> `amd64` com a versão `0.1.1`; a instalação da `0.2.0`, o `aarch64` e os testes
+> ponta a ponta com Alexa/Music Assistant ainda não foram executados. Leia a
 > [matriz de validação](docs/VALIDATION-MATRIX.md) antes de instalar. Este
 > projeto **não** é afiliado à Amazon ou ao Music Assistant.
 
@@ -167,8 +169,8 @@ pela interface e o setup assistido.
 5. Se houver mais de um add-on correspondente, selecione o slug correto.
 
 **HACS:** o repositório está preparado para instalação como repositório
-personalizado do HACS, mas a validação do HACS Action **ainda não foi
-executada**. Não há inclusão no catálogo padrão e ainda falta
+personalizado do HACS e a HACS Action **passou no CI**. Não há inclusão no
+catálogo padrão e ainda falta
 `custom_components/alexa_ma_skill/brand/icon.png`. A partir do Home Assistant
 2026.11, o HACS é distribuído como **Marketplace**; os nomes de menu podem
 variar.
@@ -359,21 +361,19 @@ Não há canal oficial de suporte por e-mail, Discord ou comunidade. O repositó
 
 | Item | Estado |
 |---|---|
+| CI (GitHub Actions) | **4 jobs aprovados** no run 45276992158 |
+| Suíte pytest no CI Linux | **56 testes e 26 subtestes aprovados** |
+| Config flow (6 testes) | Aprovados no CI Linux |
+| Hassfest | **Aprovado no CI** |
+| HACS Action | **Aprovada no CI** (com ignores de metadados do GitHub) |
 | Add-on em HA OS `amd64` | Parcial — evidência real com a versão `0.1.1` |
-| Integração (helpers) | 34 testes locais aprovados |
 | Add-on (unitários) | 16 testes locais aprovados (1 pulo POSIX) |
-| Config flow (6 testes) | Aprovados em execução local suplementar no Windows |
-| Suíte pytest completa | 55 passaram, 1 pulo, 26 subtests (Windows com shims) |
-| Auditoria estática do Hassfest | Ordem do manifesto e URLs em traduções corrigidas |
-| Hassfest (10 plugins oficiais) | 0 erros em execução local (HA Core `2026.10.4`) |
-| Workflow de CI | `actionlint` passou; execução real pendente |
-| Hassfest oficial / HACS Action | Não executados (exigem Docker/CI) |
 | `aarch64` | Não executado |
 | Comandos, backup e restore | Pendentes |
 
-Os shims do Windows ficam fora do repositório e **não substituem** a execução
-oficial em Linux. Não há screenshots reais e o ícone de marca do HACS ainda
-precisa ser adicionado.
+Os testes locais no Windows usaram shims fora do repositório e são apenas
+suplementares. Não há screenshots reais e o ícone de marca do HACS ainda precisa
+ser adicionado.
 
 Detalhes e evidências em [docs/VALIDATION-MATRIX.md](docs/VALIDATION-MATRIX.md) e
 [docs/DISTRIBUTION-READINESS.md](docs/DISTRIBUTION-READINESS.md). O roteiro de
@@ -463,10 +463,9 @@ Install the add-on from
 network. Expose only `POST /` publicly. Enable the skill in the Alexa app and
 say **"Alexa, open music assistant"**.
 
-Validation is partial: the add-on has real `amd64` evidence. The integration
-test suite (including 6 config-flow tests) passed in a supplementary local
-Windows run with shims kept outside the repository, and 10 official Hassfest
-plugins passed locally; official Linux CI, the Hassfest image and HACS Action
-have not been executed. See
+Validation is partial: the add-on has real `amd64` evidence with `0.1.1`. CI
+passed on commit `ee16d8b` (add-on, 56 Linux tests, Hassfest and HACS Action).
+The 0.2.0 install, aarch64, and the Alexa/Music Assistant end-to-end tests are
+still pending. See
 [`docs/VALIDATION-MATRIX.md`](docs/VALIDATION-MATRIX.md) and
 [`alexa_ma_skill/DOCS.md`](alexa_ma_skill/DOCS.md).

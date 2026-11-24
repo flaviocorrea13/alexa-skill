@@ -2,10 +2,10 @@
 
 **Data:** 23 de novembro de 2026\
 **Versão candidata:** `0.2.0`\
-**Decisão:** **NÃO DISTRIBUIR AINDA.** O repositório está organizado e
-documentado, e a suíte de testes passou em execução local suplementar, mas as
-validações que dependem de Linux/Docker, push e Home Assistant OS continuam
-bloqueadas.
+**Decisão:** **NÃO DISTRIBUIR AINDA.** Os quatro jobs do CI passaram no commit
+`ee16d8b`, incluindo Hassfest e HACS Action. Restam as validações manuais em
+Home Assistant OS, Music Assistant/Alexa, backup/restauração, `aarch64`, além
+de screenshots, `brand/icon.png` e release.
 
 Cada item abaixo tem estado e evidência. Documentação existente não conta como
 teste executado.
@@ -13,16 +13,16 @@ teste executado.
 | # | Item | Estado | Evidência | O que falta |
 |---|---|---|---|---|
 | 1 | Auditoria das Etapas 1, 2 e 3 | **CONCLUÍDO** | matriz de validação e auditoria interna registrada no plano de publicação (mantido fora do PR) | — |
-| 2 | Bloqueios críticos resolvidos | **PARCIAL** | nenhum bloqueio de segurança/instalação encontrado; Hassfest estático corrigiu ordem do manifesto e URLs em traduções | Confirmar em CI e HA OS |
+| 2 | Bloqueios críticos resolvidos | **CONCLUÍDO** | CI, Hassfest e HACS Action aprovados; nenhum bloqueio de segurança/instalação encontrado | Revalidar após alterações |
 | 3 | README público revisado | **CONCLUÍDO** | `README.md` reestruturado | — |
 | 4 | Documentação técnica coerente | **CONCLUÍDO** | `DOCS.md`, `AGENTS.md` e `docs/` revisados | Repetir após cada mudança funcional |
 | 5 | CHANGELOG atualizado | **CONCLUÍDO** | `CHANGELOG.md` com `0.2.0` (não publicado) e categorias | Publicar após validação |
 | 6 | Versões consistentes | **CONCLUÍDO** | `config.yaml`, `manifest.json` e CHANGELOG em `0.2.0`; validadas por `scripts/validate_repo.py` | — |
-| 7 | Manifestos validados | **PARCIAL** | validação estrutural local + auditoria estática do Hassfest | Hassfest oficial não executado |
-| 8 | CI configurada | **CONCLUÍDO** | `.github/workflows/ci.yml` auditado, actions fixadas por SHA, HACS `ignore` corrigido, dependabot | Primeira execução depende de push/PR |
-| 9 | Testes automatizados executados | **PARCIAL** | **55 passed, 1 skipped, 26 subtests** no pytest completo no Windows com shims; 6 config flow passaram | Execução Linux/CI pendente |
-| 10 | Hassfest validado | **PARCIAL** | 10 plugins oficiais do Hassfest (HA Core `2026.10.4`) passaram com **0 erros**; execução oficial via Docker/CI pendente | Executar no GitHub Actions |
-| 11 | Requisitos HACS verificados | **PARCIAL** | schemas/documentação oficiais auditados; `hacs.json` e manifesto conformes | HACS Action, `brand/icon.png` e release |
+| 7 | Manifestos validados | **CONCLUÍDO** | Hassfest oficial aprovado no CI (run 45276992158) | — |
+| 8 | CI configurada e executada | **CONCLUÍDO** | 4 jobs aprovados no run 45276992158, commit `ee16d8b` | Reexecutar após as correções de aviso |
+| 9 | Testes automatizados executados | **CONCLUÍDO** | **56 testes e 26 subtestes** no Linux/CI (Python 3.14.10, HA 2026.10.4) | — |
+| 10 | Hassfest validado | **CONCLUÍDO** | job `hassfest` aprovado no run 45276992158 | — |
+| 11 | Requisitos HACS verificados | **PARCIAL** | HACS Action aprovada com ignores de metadados do GitHub | `brand/icon.png`, release e Action sem ignores para o catálogo padrão |
 | 12 | Repositório de add-ons validado | **PARCIAL** | metadados validados; tag/digest upstream confirmada no GHCR com `linux/amd64` e `linux/arm64` | Instalação da `0.2.0` não reexecutada |
 | 13 | Arquiteturas documentadas | **CONCLUÍDO** | `amd64` e `aarch64` em `config.yaml`; matriz distingue declaração, índice OCI e execução | `aarch64` não executado |
 | 14 | Segurança revisada | **CONCLUÍDO** | validador de segredos/LF/links; actions fixadas por SHA; exposição documentada | Repetir antes de cada release |
@@ -31,7 +31,19 @@ teste executado.
 | 17 | Instruções de suporte disponíveis | **CONCLUÍDO** | README, templates de issue e `DOCS.md` | — |
 | 18 | Testes manuais pendentes identificados | **CONCLUÍDO** | `docs/VALIDATION-MATRIX.md` | Executar antes do beta |
 
-## Validação executada em 23/11/2026
+## CI remoto — 23/11/2026
+
+| Item | Resultado |
+|---|---|
+| Run | [45276992158](https://github.com/flaviocorrea13/alexa-skill/actions/runs/45276992158) |
+| Commit | `ee16d8b32f442afa40cb598a4d5fee64cec647c1` |
+| PR | #1, Draft |
+| Repository and add-on validation | **Sucesso** |
+| Integration tests (Linux, Python 3.14.10, HA 2026.10.4) | **Sucesso — 56 testes, 26 subtestes** |
+| Hassfest | **Sucesso** |
+| HACS validation | **Sucesso** |
+
+## Validação local complementar
 
 | Comando | Resultado |
 |---|---|
@@ -46,9 +58,15 @@ teste executado.
 | `python -m compileall -q ...` / `bash -n run.sh` | **PASSOU** |
 | Consulta read-only ao GHCR | digest confere; índice `linux/amd64` e `linux/arm64` |
 
-**Limitação:** o pytest rodou no Windows com shims `fcntl`/`resource` e sockets
-habilitados, mantidos fora do repositório. Não é uma execução Linux e não
-substitui a CI. O pulo é a asserção de permissão POSIX.
+**Limitação:** a execução local no Windows usou shims `fcntl`/`resource` e
+sockets habilitados, mantidos fora do repositório. Ela é suplementar; a
+validação Linux oficial foi concluída no CI. O pulo é a asserção de permissão
+POSIX.
+
+**Avisos tratados:** a autenticação básica passou a usar
+`aiohttp.encode_basic_auth` com cabeçalho `Authorization`, removendo a
+depreciação do `aiohttp.BasicAuth`; `actions/checkout` e
+`actions/setup-python` foram atualizados para versões Node 24 (v7).
 
 ## HACS e distribuição do add-on
 
@@ -94,32 +112,27 @@ GHCR. A instalação da `0.2.0` pelo store continua pendente.
 
 ## Bloqueios para a primeira distribuição
 
-1. **Sem Linux/Docker/WSL nesta máquina.** Hassfest oficial, HACS Action e CI
-   não podem ser executados localmente.
-2. **Sem push autorizado.** CI e HACS Action validam o repositório remoto, que
-   ainda está no commit `2444dbf`; o worktree atual não foi enviado.
-3. **`pytest` oficial em Linux pendente.** A suíte passou no Windows com shims.
-4. **Hassfest oficial não executado.** Dez plugins oficiais passaram localmente
-   com 0 erros, mas a imagem oficial e o plugin `dependencies` continuam
-   pendentes.
-5. **HACS Action não executada.**
-6. **Versão `0.2.0` não instalada em HA OS.** A evidência real é da `0.1.1`.
-7. **`aarch64` sem execução real.**
-8. **`brand/icon.png` ausente e nenhuma Release publicada** (requisitos do
+1. **Versão `0.2.0` não instalada em HA OS.** A evidência real disponível é da
+   `0.1.1`.
+2. **Teste ponta a ponta com Alexa e Music Assistant não executado na `0.2.0`.**
+3. **Backup e restauração não testados.**
+4. **`aarch64` sem execução real.**
+5. **`brand/icon.png` ausente e nenhuma Release publicada** (requisitos do
    catálogo padrão, não do repositório personalizado).
-9. **Screenshots reais não capturadas.**
+6. **Screenshots reais não capturadas.**
 
 ## O que não bloqueia a preparação
 
 - README, DOCS, AGENTS, CHANGELOG e documentos de distribuição estão prontos.
+- CI, Hassfest e HACS Action aprovados no commit `ee16d8b`.
 - O validador local cobre metadados, versões, links, LF, segredos e regras de
   tradução equivalentes às que mais quebram o Hassfest.
 - O rascunho de Release pode ser revisado antes da publicação.
 
 ## Próximo passo permitido
 
-Autorizar commit/push em um branch e abrir um pull request para executar CI,
-Hassfest e HACS Action. Depois, seguir
-[`HAOS-TEST-PLAN.md`](HAOS-TEST-PLAN.md) para validar a `0.2.0` em HA OS
-`amd64`, capturar as telas reais e, se desejado, adicionar `brand/icon.png`.
-Nenhuma tag, Release ou publicação de imagem deve ocorrer antes disso.
+Seguir [`HAOS-TEST-PLAN.md`](HAOS-TEST-PLAN.md) para validar a `0.2.0` em HA OS
+`amd64` e, se possível, `aarch64`: instalação, `/setup`, `/status`, provider
+Alexa, áudio, comandos, backup/restauração e reinício. Depois, capturar as telas
+reais e, se desejado, adicionar `brand/icon.png`. Nenhuma tag, Release ou
+publicação de imagem deve ocorrer antes disso.

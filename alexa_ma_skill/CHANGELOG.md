@@ -59,6 +59,11 @@ descritas em `docs/DISTRIBUTION-READINESS.md`.
 - Removidas URLs dos valores de tradução, que o Hassfest rejeita.
 - Corrigido o separador do `ignore` do HACS Action (lista separada por espaço) e
   desabilitado o comentário automático em PR com token somente leitura.
+- Autenticação básica passou a usar `aiohttp.encode_basic_auth` com cabeçalho
+  `Authorization`, removendo a depreciação de `aiohttp.BasicAuth` para o
+  aiohttp 4.0.
+- `actions/checkout` e `actions/setup-python` atualizados para versões Node 24
+  (v7), eliminando os avisos de transição do runner.
 
 ### Segurança
 
@@ -81,11 +86,15 @@ descritas em `docs/DISTRIBUTION-READINESS.md`.
 
 ### Pendente de validação
 
-- Primeira execução da CI, Hassfest e HACS Action.
-- `pytest` oficial em Linux (a execução no Windows com shims é suplementar).
 - Instalação da `0.2.0` em Home Assistant OS `amd64` e `aarch64`.
+- Teste ponta a ponta com Alexa e Music Assistant na `0.2.0`.
 - Comandos de controle, backup/restauração e screenshots reais.
 - `brand/icon.png` e uma Release completa para o catálogo padrão do HACS.
+
+### Validação automatizada
+
+- CI do GitHub Actions aprovada no commit `ee16d8b` (run 45276992158): add-on,
+  56 testes Linux/HA, Hassfest e HACS Action.
 
 ## 0.1.1 - 2026-11-23
 

@@ -5,10 +5,10 @@ Add-on do Home Assistant que executa o contêiner do projeto
 expõe a skill Alexa usada para controlar o Music Assistant por voz.
 
 > **Escopo desta versão:** o **add-on** é o componente necessário. A integração
-> em `custom_components/alexa_ma_skill/` é **opcional**: está implementada no
-> código, incluindo o checklist de 16 etapas, mas os testes completos de config
-> flow/options flow, Hassfest e HACS Action ainda não foram executados. A CI está
-> configurada em `.github/workflows/ci.yml`. Consulte a
+> em `custom_components/alexa_ma_skill/` é **opcional**: está implementada,
+> incluindo o checklist de 16 etapas. CI, Hassfest e HACS Action passaram no
+> commit `ee16d8b` (run 45276992158); ainda faltam um teste dedicado do options
+> flow e a validação em HA OS. Consulte a
 > [`docs/VALIDATION-MATRIX.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/VALIDATION-MATRIX.md)
 > para o estado real das validações.
 
@@ -55,8 +55,8 @@ Add-ons instalados de um repositório personalizado recebem um prefixo
 `0a1b2c3d_alexa_ma_skill` em vez de `alexa_ma_skill`.
 
 O hostname interno do add-on é derivado do slug trocando `_` por `-`. A
-integração opcional usa este slug e hostname; ela está implementada, mas os
-testes completos em Linux e o Hassfest ainda estão pendentes.
+integração opcional usa este slug e hostname; ela está implementada e validada
+no CI Linux/Hassfest. A validação em HA OS ainda está pendente.
 
 Exemplos:
 
@@ -92,12 +92,11 @@ configuração e diagnóstico. O add-on funciona sem ela.
 3. Adicione `https://github.com/flaviocorrea13/alexa-skill` como integração.
 4. Instale **Alexa MA Skill** e reinicie o Home Assistant.
 
-O HACS não é necessário. A conformidade com o HACS Action e com o catálogo
-padrão **não foi validada**; a instalação como repositório personalizado é o
-único caminho documentado. Ainda falta o arquivo
-`custom_components/alexa_ma_skill/brand/icon.png` e não existe Release publicada.
-A partir do Home Assistant 2026.11, o HACS é distribuído como **Marketplace**;
-os nomes de menu podem variar.
+O HACS não é necessário. A HACS Action passou no CI para a instalação como
+repositório personalizado; a inclusão no catálogo padrão **não foi validada** e
+ainda exige `custom_components/alexa_ma_skill/brand/icon.png` e uma Release
+publicada. A partir do Home Assistant 2026.11, o HACS é distribuído como
+**Marketplace**; os nomes de menu podem variar.
 
 ### Descoberta do add-on
 
@@ -364,12 +363,10 @@ Alterações de configuração invalidam apenas as etapas manuais dependentes:
   integração.
 - O teste de stream confirma HTTPS/resposta, não o conteúdo do áudio.
 - Testes de reprodução e comandos dependem de confirmação manual real.
-- Os testes de config flow/options flow exigem o harness Linux do Home
-  Assistant. Em 23/11/2026 a suíte passou em execução local suplementar no
-  Windows, com shims mantidos fora do repositório: 6 config flow e 55 testes no
-  total. Isso **não substitui** a execução oficial em Linux/CI. Dez plugins
-  oficiais do Hassfest passaram localmente com 0 erros; a imagem oficial do
-  Hassfest, o plugin `dependencies` e o HACS Action continuam pendentes.
+- Os testes de config flow e da suíte completa passaram no CI Linux (56 testes e
+  26 subtestes, commit `ee16d8b`); a execução no Windows com shims foi apenas
+  suplementar. Hassfest e HACS Action também passaram no CI. Ainda falta um
+  teste dedicado do options flow e a validação em HA OS.
 - A integração não gerencia `TZ` nem tenta recuperar segredos que o Supervisor
   mantém apenas em arquivos.
 - A versão mínima declarada em `hacs.json` é Home Assistant `2026.10.4`

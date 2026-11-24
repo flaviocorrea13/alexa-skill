@@ -644,6 +644,55 @@ class ApiParsingTest(unittest.TestCase):
         self.assertEqual(setup.logs, ())
 
 
+class _FakeResponse:
+    """Minimal aiohttp-like response for the auth header test."""
+
+    status = 200
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return False
+
+    async def text(self) -> str:
+        return "ok"
+
+
+class _FakeSession:
+    """Capture request kwargs without opening a connection."""
+
+    def __init__(self) -> None:
+        self.kwargs: dict[str, Any] = {}
+
+    def request(self, _method: str, _url: str, **kwargs):
+        self.kwargs = kwargs
+        return _FakeResponse()
+
+
+@unittest.skipUnless(HA_AVAILABLE, "Home Assistant libraries are not installed")
+class ApiAuthHeaderTest(unittest.TestCase):
+    """Validate basic auth without the deprecated aiohttp.BasicAuth API."""
+
+    def test_authorization_header_is_set(self) -> None:
+        session = _FakeSession()
+        api = AlexaMaSkillApi(
+            None, "http://localhost:5000", "user", "pass", session=session
+        )
+        asyncio.run(api.async_get_status())
+        self.assertEqual(
+            session.kwargs["headers"]["Authorization"], "Basic dXNlcjpwYXNz"
+        )
+        self.assertNotIn("auth", session.kwargs)
+
+    def test_no_authorization_header_without_credentials(self) -> None:
+        session = _FakeSession()
+        api = AlexaMaSkillApi(None, "http://localhost:5000", "", "", session=session)
+        asyncio.run(api.async_get_status())
+        self.assertNotIn("Authorization", session.kwargs["headers"])
+        self.assertNotIn("auth", session.kwargs)
+
+
 class FakeConfig:
     """Minimal hass.config for Supervisor discovery tests."""
 

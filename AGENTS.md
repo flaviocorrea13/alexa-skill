@@ -290,8 +290,9 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 
 ### 7.1 Fase 2 — integração personalizada
 
-Implementada, **opcional**, com testes de helpers aprovados. A suíte completa de
-config flow/options flow, Hassfest e CI Linux ainda está pendente.
+Implementada, **opcional**, com testes de helpers e config flow aprovados no CI
+Linux, Hassfest e HACS Action aprovados. Falta um teste dedicado do options flow
+e a validação em HA OS.
 
 - `custom_components/alexa_ma_skill/` com `manifest.json` existe.
 - Config flow pela UI do Home Assistant existe, incluindo descoberta de slug,
@@ -435,10 +436,13 @@ worktree local e **fora do repositório público/PR**.
   traduções (URLs/HTML/placeholders), steps/menu do config flow, LF e padrões de
   segredo. A auditoria estática do Hassfest corrigiu a ordem do `manifest.json`
   e removeu URLs das traduções.
-- Hassfest: **10 plugins oficiais** (HA Core `2026.10.4`) passaram com 0 erros
-  via `scripts/run_hassfest_subset.py`; a imagem oficial e o plugin
-  `dependencies` continuam pendentes. HACS Action e CI Linux **não executados**.
-  O workflow existe em `.github/workflows/ci.yml`.
+- Hassfest: **10 plugins oficiais** (HA Core `2026.10.4`) passaram localmente
+  com 0 erros; a execução oficial da imagem, incluindo `dependencies`, passou no
+  CI (run 45276992158).
+- CI Linux, Hassfest e HACS Action: **executados e aprovados** no commit
+  `ee16d8b` (run 45276992158). O job de integração aprovou 56 testes e 26
+  subtestes. A autenticação básica deixou de usar `aiohttp.BasicAuth` depreciado
+  e as actions foram atualizadas para versões Node 24.
 - Verificação de LF.
 - Em HA OS real, com evidência do usuário: add-on `0.1.1` instalado e
   atualizado pela loja, `/setup` reutilizou a skill, provider Alexa do Music
@@ -529,10 +533,11 @@ Validação local no Windows:
 - testes dos helpers da integração, usando o virtualenv:
   `.venv/Scripts/python.exe -m unittest tests.test_integration_helpers`
 
-O `pytest` completo da integração **deve** rodar no CI Linux. O workflow está em
-`.github/workflows/ci.yml`; a primeira execução depende de push/PR e ainda não
-ocorreu. O pacote é `pytest-homeassistant-custom-component==0.13.375` (Home
-Assistant 2026.10.4, Python >= 3.14). `tests/conftest.py` registra o plugin do
+O `pytest` completo da integração roda no CI Linux. O workflow está em
+`.github/workflows/ci.yml` e já foi executado com sucesso no run 45276992158
+(commit `ee16d8b`): 56 testes e 26 subtestes. O pacote é
+`pytest-homeassistant-custom-component==0.13.375` (Home Assistant 2026.10.4,
+Python >= 3.14). `tests/conftest.py` registra o plugin do
 harness e `pyproject.toml` define `asyncio_mode = "auto"`.
 
 ### WSL (opcional)
@@ -863,14 +868,14 @@ dependentes, para não reutilizar confirmação fora de contexto.
    `comment: "false"`.
 
 As actions são fixadas por SHA de commit e o `.github/dependabot.yml` mantém os
-SHAs atualizados. Nota: Hassfest e HACS são Docker actions publicadas pelos
+SHAs atualizados. `actions/checkout@v7.0.1` e `actions/setup-python@v7.1.0`
+usam Node 24. Nota: Hassfest e HACS são Docker actions publicadas pelos
 mantenedores; o SHA fixa o repositório da action, mas a imagem Docker referenciada
 internamente continua sendo resolvida pelo mantenedor. Regras: não publicar
 imagens, tags ou Releases; não usar `:latest`; não exigir credenciais pessoais;
-não mascarar falhas com `continue-on-error`. A CI foi auditada e corrigida, mas
-**não executada** nesta etapa. O workflow passou no `actionlint 1.7.12` com 0
-erros, o que valida sintaxe, expressões e entradas das actions, mas não substitui
-a execução real.
+não mascarar falhas com `continue-on-error`. A CI foi **executada com sucesso**
+no run 45276992158 (commit `ee16d8b`), com os 4 jobs aprovados. O `actionlint`
+também passou com 0 erros.
 
 ### 15.4 Validador local
 
@@ -895,10 +900,10 @@ a execução real.
 
 ### 15.5 HACS e add-on
 
-- HACS: instalação documentada como **repositório personalizado**. A inclusão no
-  catálogo padrão **não** foi solicitada e depende de HACS Action sem ignores,
-  Hassfest, uma Release completa, metadados do GitHub
-  (description/topics/issues) e `brand/icon.png`.
+- HACS: instalação documentada como **repositório personalizado**. A HACS
+  Action passou no CI com ignores de metadados do GitHub. A inclusão no catálogo
+  padrão **não** foi solicitada e exige Action sem ignores, Hassfest, Release
+  completa, metadados do GitHub e `brand/icon.png`.
 - Falta `custom_components/alexa_ma_skill/brand/icon.png`; o HACS usa o domínio
   em `home-assistant/brands` como alternativa, mas o arquivo local ainda não
   existe.
@@ -914,9 +919,8 @@ a execução real.
 
 ### 15.6 Pendências da Fase 4
 
-- Primeira execução da CI, Hassfest e HACS Action (exigem push e/ou Docker).
-- `pytest` oficial em Linux (o Windows com shims é evidência suplementar).
 - Instalação da `0.2.0` em HA OS `amd64` e, se possível, `aarch64`.
+- Teste ponta a ponta com Alexa e Music Assistant na `0.2.0`.
 - Comandos, backup/restauração e acesso externo completo.
 - `brand/icon.png` e uma Release completa para o catálogo padrão do HACS.
 - Screenshots reais sem dados sensíveis.
