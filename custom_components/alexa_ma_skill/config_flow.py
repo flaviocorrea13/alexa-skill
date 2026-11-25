@@ -74,7 +74,7 @@ from .supervisor import (
     SupervisorUnavailableError,
     addon_hostname,
 )
-from .util import entry_config
+from .util import entry_config, mask_skill_ids_in_text
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,6 +123,16 @@ def _clean_hostname(value: Any, *, required: bool = True) -> str:
     if len(text) > 253:
         raise _FlowError("invalid_hostname", {"host": _safe_input(text)})
     return text
+
+
+def _entry_title(hostname: Any) -> str:
+    """Return the config entry title without exposing a full skill ID.
+
+    The title is built from the hostname field. If a skill ID was pasted there
+    by mistake, it is masked instead of being shown in the integrations list
+    and in the device name.
+    """
+    return f"{NAME} ({mask_skill_ids_in_text(str(hostname or ''))})"
 
 
 def _clean_base_url(value: Any) -> str:
@@ -599,7 +609,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
             if reuse_credentials:
                 return self.async_create_entry(
-                    title=f"{NAME} ({skill_hostname})",
+                    title=_entry_title(skill_hostname),
                     data=self._pending_data,
                 )
             return await self.async_step_credentials()
@@ -762,7 +772,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_IGNORE_HTTPS: ignore_https,
             }
             return self.async_create_entry(
-                title=f"{NAME} ({skill_hostname})",
+                title=_entry_title(skill_hostname),
                 data=data,
             )
         except _FlowError as err:
@@ -799,7 +809,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
             )
         return self.async_create_entry(
-            title=f"{NAME} ({self._pending_data.get(CONF_SKILL_HOSTNAME, '')})",
+            title=_entry_title(self._pending_data.get(CONF_SKILL_HOSTNAME, "")),
             data=self._pending_data,
         )
 

@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .coordinator import AlexaMaSkillCoordinator, AlexaMaSkillData
 from .entity import AlexaMaSkillEntity, get_coordinator
-from .util import skill_linked
+from .util import mask_skill_identifier, skill_linked
 
 
 def _skill_linked(data: AlexaMaSkillData) -> bool:
@@ -35,11 +35,16 @@ def _skill_id_valid(data: AlexaMaSkillData) -> bool:
 
 
 def _skill_id_attributes(data: AlexaMaSkillData) -> dict[str, Any]:
-    """Return the configured, detected, and suggested skill IDs."""
+    """Return the masked skill IDs and the comparison result.
+
+    A full skill ID is never exposed as an attribute. The detected value is
+    only a suggestion for the configured one, so a boolean carries that hint
+    instead of repeating the masked identifier.
+    """
     return {
-        "configured_skill_id": data.configured_skill_id or None,
-        "detected_skill_id": data.detected_skill_id,
-        "suggested_skill_id": data.suggested_skill_id,
+        "configured_skill_id_masked": mask_skill_identifier(data.configured_skill_id),
+        "detected_skill_id_masked": mask_skill_identifier(data.detected_skill_id),
+        "skill_id_suggested": data.suggested_skill_id is not None,
         "skill_id_matches": data.skill_id_matches,
     }
 

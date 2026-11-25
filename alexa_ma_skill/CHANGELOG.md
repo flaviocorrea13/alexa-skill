@@ -39,6 +39,11 @@ descritas em `docs/DISTRIBUTION-READINESS.md`.
   distribuição e suporte.
 - `AGENTS.md` com a arquitetura da Fase 4, regras de CI e estado real.
 - Versão do add-on e da integração alinhada em `0.2.0`.
+- `sensor.setup_checklist` passou a publicar apenas uma allowlist de atributos:
+  `console_values`, URLs internas e públicas, regras de Cloudflare e Skill IDs
+  completos não são mais expostos nas entidades. Textos passam por sanitização
+  e valores suspeitos são mascarados. O Options Flow continua usando os dados
+  completos internamente por meio de `build_setup_checklist()`.
 - `pyproject.toml` centraliza a configuração de ruff e pytest.
 
 ### Corrigido

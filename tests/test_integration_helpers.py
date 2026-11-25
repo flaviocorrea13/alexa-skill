@@ -8,6 +8,7 @@ available.
 from __future__ import annotations
 
 import asyncio
+import json
 import unittest
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -23,11 +24,15 @@ try:
         SetupStatus,
         SimpleStatus,
     )
-    from custom_components.alexa_ma_skill.binary_sensor import _skill_id_valid
+    from custom_components.alexa_ma_skill.binary_sensor import (
+        _skill_id_attributes,
+        _skill_id_valid,
+    )
     from custom_components.alexa_ma_skill.config_flow import (
         AlexaMaSkillOptionsFlow,
         _clean_hostname,
         _clean_ma_api_url,
+        _entry_title,
         _FlowError,
         _option_matches,
         _preserve_password,
@@ -42,11 +47,23 @@ try:
         AlexaMaSkillData,
     )
     from custom_components.alexa_ma_skill.diagnostics import (
+        TO_REDACT,
         _coordinator_data,
         _mask_skill_id_fields,
+        async_get_config_entry_diagnostics,
     )
     from custom_components.alexa_ma_skill.https import _skill_status_ok
-    from custom_components.alexa_ma_skill.sensor import _overall_status
+    from custom_components.alexa_ma_skill.entity import (
+        AlexaMaSkillEntity,
+        safe_entry_title,
+    )
+    from custom_components.alexa_ma_skill.sensor import (
+        SENSORS,
+        AlexaMaSkillSensor,
+        AlexaMaSkillSetupChecklistSensor,
+        _overall_status,
+        _setup_checklist_attributes,
+    )
     from custom_components.alexa_ma_skill.setup import (
         _RESULT_TEXTS,
         _STEP_TEXTS,
@@ -62,7 +79,9 @@ try:
     )
     from custom_components.alexa_ma_skill.util import (
         extract_skill_id,
+        is_valid_skill_id,
         mask_skill_id,
+        mask_skill_identifier,
         mask_skill_ids_in_text,
     )
 
@@ -599,6 +618,212 @@ class UtilAndChecklistTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HA_AVAILABLE, "Home Assistant libraries are not installed")
+class SkillIdAttributeTest(unittest.TestCase):
+    """Ensure the Skill ID entity never exposes full identifiers."""
+
+    MISTYPED_SECRET = "mistyped-secret-0123456789"
+
+    def test_attributes_are_masked(self) -> None:
+        attributes = _skill_id_attributes(
+            _data(
+                configured_skill_id=GOOD_ID,
+                detected_skill_id=OTHER_ID,
+                suggested_skill_id=OTHER_ID,
+                skill_id_matches=False,
+            )
+        )
+        self.assertEqual(
+            set(attributes),
+            {
+                "configured_skill_id_masked",
+                "detected_skill_id_masked",
+                "skill_id_suggested",
+                "skill_id_matches",
+            },
+        )
+        self.assertEqual(
+            attributes["configured_skill_id_masked"], mask_skill_id(GOOD_ID)
+        )
+        self.assertEqual(
+            attributes["detected_skill_id_masked"], mask_skill_id(OTHER_ID)
+        )
+        self.assertIs(attributes["skill_id_suggested"], True)
+        self.assertIs(attributes["skill_id_matches"], False)
+
+        serialized = json.dumps(attributes, default=str)
+        self.assertNotIn(GOOD_ID, serialized)
+        self.assertNotIn(OTHER_ID, serialized)
+        self.assertNotIn("suggested_skill_id", attributes)
+
+    def test_matching_id_has_no_suggestion(self) -> None:
+        attributes = _skill_id_attributes(
+            _data(
+                configured_skill_id=GOOD_ID,
+                detected_skill_id=GOOD_ID,
+                suggested_skill_id=None,
+                skill_id_matches=True,
+            )
+        )
+        self.assertIs(attributes["skill_id_suggested"], False)
+        self.assertIs(attributes["skill_id_matches"], True)
+        self.assertEqual(attributes["detected_skill_id_masked"], mask_skill_id(GOOD_ID))
+
+    def test_unknown_ids_become_none(self) -> None:
+        attributes = _skill_id_attributes(
+            _data(
+                configured_skill_id="",
+                detected_skill_id=None,
+                suggested_skill_id=None,
+                skill_id_matches=None,
+            )
+        )
+        self.assertIsNone(attributes["configured_skill_id_masked"])
+        self.assertIsNone(attributes["detected_skill_id_masked"])
+        self.assertIs(attributes["skill_id_suggested"], False)
+        self.assertIsNone(attributes["skill_id_matches"])
+
+    def test_invalid_values_are_fully_masked(self) -> None:
+        attributes = _skill_id_attributes(
+            _data(
+                configured_skill_id=self.MISTYPED_SECRET,
+                detected_skill_id=self.MISTYPED_SECRET,
+                suggested_skill_id=None,
+                skill_id_matches=None,
+            )
+        )
+        self.assertEqual(attributes["configured_skill_id_masked"], "***")
+        self.assertEqual(attributes["detected_skill_id_masked"], "***")
+        serialized = json.dumps(attributes, default=str)
+        self.assertNotIn(self.MISTYPED_SECRET, serialized)
+        self.assertNotIn(self.MISTYPED_SECRET[:16], serialized)
+
+    def test_state_logic_is_unchanged(self) -> None:
+        self.assertTrue(_skill_id_valid(_data()))
+        self.assertFalse(
+            _skill_id_valid(_data(configured_skill_id="", skill_id_matches=None))
+        )
+        self.assertFalse(
+            _skill_id_valid(_data(skill_id_matches=False, suggested_skill_id=GOOD_ID))
+        )
+
+
+class SkillIdPublicationTest(unittest.TestCase):
+    """Ensure every published text is free of complete skill IDs."""
+
+    MISTYPED = "amzn1.ask.skill.mistyped-secret"
+    TOKEN = "fake-ma-token-0123456789"
+
+    def _detailed(self) -> DetailedStatus:
+        ma_api = json.dumps(
+            {
+                "streamUrl": "https://stream.example.test/a?token=x",
+                "note": GOOD_ID,
+            }
+        )
+        return DetailedStatus(
+            skill_html=f"<span>{GOOD_ID}</span>",
+            skill_ask_html=(
+                f'<span class="led green">{GOOD_ID}</span> endpoint matches; '
+                f"testing enabled; detected {OTHER_ID}"
+            ),
+            ma_api_html=f"<pre>{ma_api}</pre>",
+            alexa_api_html=f'<span class="led green"></span> ok {GOOD_ID}',
+            metadata_html=f"<p>{OTHER_ID}</p>",
+            invocations_html=f"<p>{GOOD_ID}</p>",
+            created=True,
+            skill_ask_level=StatusLevel.GREEN,
+            ma_api_level=StatusLevel.GREEN,
+            alexa_api_level=StatusLevel.GREEN,
+        )
+
+    def _sensor(self, key: str) -> AlexaMaSkillSensor:
+        description = next(item for item in SENSORS if item.key == key)
+        sensor = object.__new__(AlexaMaSkillSensor)
+        sensor.entity_description = description
+        sensor.coordinator = SimpleNamespace(
+            data=_data(detailed=self._detailed()),
+            last_update_success=True,
+        )
+        return sensor
+
+    def test_status_sensors_hide_complete_skill_ids(self) -> None:
+        for key in ("skill_status", "ma_api", "alexa_api"):
+            sensor = self._sensor(key)
+            value = sensor.native_value
+            self.assertIsInstance(value, str)
+            self.assertIn("...", value)
+            payload = json.dumps(
+                {
+                    "state": value,
+                    "attributes": getattr(sensor, "extra_state_attributes", None),
+                },
+                default=str,
+            )
+            for full_id in (GOOD_ID, OTHER_ID):
+                self.assertNotIn(full_id, payload)
+            self.assertNotIn("token=x", payload)
+
+    def test_status_text_handles_ids_outside_html(self) -> None:
+        self.assertEqual(
+            mask_skill_ids_in_text(f"Done. Skill ID: {GOOD_ID}."),
+            f"Done. Skill ID: {mask_skill_id(GOOD_ID)}.",
+        )
+
+    def test_malformed_candidates_are_fully_masked(self) -> None:
+        self.assertEqual(mask_skill_ids_in_text(f"id {self.MISTYPED}"), "id ***")
+        self.assertEqual(mask_skill_ids_in_text("amzn1.ask.skill.abc.def"), "***")
+        self.assertEqual(mask_skill_ids_in_text("amzn1.ask.skill.1111-2222"), "***")
+        self.assertEqual(mask_skill_identifier(self.MISTYPED), "***")
+        self.assertFalse(is_valid_skill_id(self.MISTYPED))
+        self.assertFalse(is_valid_skill_id("amzn1.ask.skill"))
+        self.assertFalse(is_valid_skill_id(self.TOKEN))
+        self.assertTrue(is_valid_skill_id(GOOD_ID))
+        self.assertTrue(is_valid_skill_id(f"  {OTHER_ID}  "))
+
+    def test_tokens_without_alexa_prefix_are_not_reinterpreted(self) -> None:
+        # The helper only targets skill-ID-like values; it must not invent a
+        # partial mask for an unrelated token.
+        self.assertEqual(mask_skill_ids_in_text(self.TOKEN), self.TOKEN)
+        self.assertEqual(mask_skill_identifier(self.TOKEN), "***")
+
+    def test_detection_is_unchanged(self) -> None:
+        self.assertEqual(extract_skill_id(f"Created skill: {GOOD_ID}"), GOOD_ID)
+        self.assertEqual(extract_skill_id(f"old {OTHER_ID}\nDone. {GOOD_ID}"), GOOD_ID)
+        self.assertIsNone(extract_skill_id("nothing"))
+
+
+@unittest.skipUnless(HA_AVAILABLE, "Home Assistant libraries are not installed")
+class EntryTitleSanitizationTest(unittest.TestCase):
+    """Ensure a skill ID pasted as hostname never reaches the UI."""
+
+    def test_title_masks_skill_id_hostname(self) -> None:
+        title = _entry_title(GOOD_ID)
+        self.assertTrue(title.startswith("Alexa MA Skill ("))
+        self.assertIn(mask_skill_id(GOOD_ID), title)
+        self.assertNotIn(GOOD_ID, title)
+
+    def test_title_keeps_normal_hostname(self) -> None:
+        self.assertEqual(
+            _entry_title("skill.example.test"), "Alexa MA Skill (skill.example.test)"
+        )
+        self.assertEqual(_entry_title(""), "Alexa MA Skill ()")
+
+    def test_safe_entry_title_masks_any_title(self) -> None:
+        raw = f"Alexa MA ({OTHER_ID})"
+        self.assertEqual(safe_entry_title(raw), f"Alexa MA ({mask_skill_id(OTHER_ID)})")
+
+    def test_device_info_name_is_sanitized(self) -> None:
+        entity = object.__new__(AlexaMaSkillEntity)
+        entity._entry = SimpleNamespace(
+            entry_id="entry-1", title=f"Alexa MA ({GOOD_ID})"
+        )
+        entity.coordinator = SimpleNamespace(data=_data())
+        serialized = json.dumps(dict(entity.device_info), default=str)
+        self.assertNotIn(GOOD_ID, serialized)
+        self.assertIn("Alexa MA Skill", serialized)
+
+
+@unittest.skipUnless(HA_AVAILABLE, "Home Assistant libraries are not installed")
 class ApiParsingTest(unittest.TestCase):
     """Validate /status and /setup JSON parsing without a real HTTP server."""
 
@@ -754,9 +979,170 @@ class SupervisorDiscoveryTest(unittest.TestCase):
             self.assertEqual(supervisor.discover_addons(), [])
 
 
+CHECKLIST_TEST_CONFIG = {
+    "managed": True,
+    "locale": "pt-BR",
+    "skill_hostname": "skill.example.test",
+    "ma_hostname": "stream.example.test",
+    "skill_id": GOOD_ID,
+    "ma_api_url": "http://192.0.2.10:8095",
+}
+
+
+@unittest.skipUnless(HA_AVAILABLE, "Home Assistant libraries are not installed")
+class SetupChecklistAttributesTest(unittest.TestCase):
+    """Ensure sensor.setup_checklist publishes only public attributes."""
+
+    ALLOWED = {
+        "progress",
+        "checklist",
+        "manual_steps",
+        "next_step",
+        "next_step_title",
+        "warnings",
+        "skill_found",
+        "endpoint_matches",
+        "testing_enabled",
+        "skill_id_matches",
+    }
+
+    FORBIDDEN = (
+        "skill_id",
+        "configured_skill_id",
+        "detected_skill_id",
+        "suggested_skill_id",
+        "console_values",
+        "endpoint_url",
+        "local_setup_url",
+        "provider_api_url",
+        "cloudflare_rule",
+        "amazon_console_url",
+        "usage_example",
+        "next_actions",
+    )
+
+    def _attributes(self, **overrides: Any) -> tuple[str, dict[str, Any]]:
+        state, attributes = build_setup_checklist(
+            CHECKLIST_TEST_CONFIG,
+            _data(**overrides),
+            "pt-BR",
+            {},
+        )
+        return state, _setup_checklist_attributes(attributes)
+
+    def test_only_allowlisted_keys_are_published(self) -> None:
+        state, attributes = self._attributes()
+        self.assertEqual(state, "incomplete")
+        self.assertEqual(set(attributes), self.ALLOWED)
+        for key in self.FORBIDDEN:
+            self.assertNotIn(key, attributes)
+
+    def test_no_full_skill_id_or_console_values(self) -> None:
+        _state, attributes = self._attributes()
+        serialized = json.dumps(attributes, default=str)
+        self.assertNotIn(GOOD_ID, serialized)
+        self.assertNotIn(OTHER_ID, serialized)
+        self.assertNotIn("console_values", serialized)
+        self.assertNotIn("amzn1.ask.skill.11111111", serialized)
+        self.assertNotIn("192.0.2.10", serialized)
+        self.assertNotIn("skill.example.test", serialized)
+
+    def test_checklist_content_is_preserved(self) -> None:
+        _state, attributes = self._attributes()
+        self.assertEqual(attributes["progress"]["total"], 16)
+        self.assertEqual(len(attributes["checklist"]), 16)
+        self.assertTrue(attributes["manual_steps"])
+        step = attributes["manual_steps"][0]
+        self.assertTrue(
+            {"id", "title", "status", "mode", "done", "confirmed", "how_to_fix"}
+            <= set(step)
+        )
+        self.assertIsInstance(step["confirmed"], bool)
+        self.assertIsInstance(step["dependencies"], list)
+        self.assertIn(
+            attributes["next_step"],
+            [item["id"] for item in attributes["checklist"]],
+        )
+
+    def test_nested_values_are_sanitized(self) -> None:
+        attributes = _setup_checklist_attributes(
+            {
+                "progress": {"total": 1, "next_step_title": f"Use {GOOD_ID}"},
+                "checklist": [
+                    {
+                        "id": "skill_id_obtained",
+                        "title": f"Skill {OTHER_ID}",
+                        "description": f"<pre>{GOOD_ID}</pre>",
+                        "status": "pending",
+                        "status_label": "Pendente",
+                        "result": "r",
+                        "mode": "manual",
+                        "dependencies": ["skill_created"],
+                        "optional": False,
+                        "how_to_fix": "Open https://stream.example.test/a?token=x",
+                        "done": False,
+                        "confirmed": True,
+                        "unexpected": f"leak {GOOD_ID}",
+                    }
+                ],
+                "manual_steps": [],
+                "warnings": [f"Detected {GOOD_ID}", "plain warning"],
+                "skill_found": True,
+                "endpoint_matches": True,
+                "testing_enabled": True,
+                "skill_id_matches": False,
+                "skill_id": GOOD_ID,
+                "configured_skill_id": GOOD_ID,
+                "detected_skill_id": OTHER_ID,
+                "suggested_skill_id": OTHER_ID,
+                "console_values": {"skill_id": GOOD_ID},
+            }
+        )
+        serialized = json.dumps(attributes, default=str)
+        for full_id in (GOOD_ID, OTHER_ID):
+            self.assertNotIn(full_id, serialized)
+        self.assertNotIn("token=x", serialized)
+        self.assertNotIn("console_values", attributes)
+        self.assertNotIn("unexpected", attributes["checklist"][0])
+        self.assertEqual(
+            attributes["progress"]["next_step_title"],
+            f"Use {mask_skill_id(GOOD_ID)}",
+        )
+        self.assertEqual(attributes["warnings"][1], "plain warning")
+        self.assertIs(attributes["skill_id_matches"], False)
+        self.assertIs(attributes["skill_found"], True)
+
+    def test_entity_state_and_attributes(self) -> None:
+        sensor = object.__new__(AlexaMaSkillSetupChecklistSensor)
+        sensor._checklist = SimpleNamespace(confirmations={})
+        sensor.coordinator = SimpleNamespace(
+            data=_data(),
+            hass=SimpleNamespace(config=SimpleNamespace(language="pt-BR")),
+        )
+        sensor._entry = SimpleNamespace(
+            entry_id="entry-1",
+            title="Alexa MA",
+            data={},
+            options=CHECKLIST_TEST_CONFIG,
+        )
+
+        expected_state, _attributes = build_setup_checklist(
+            CHECKLIST_TEST_CONFIG,
+            sensor.coordinator.data,
+            "pt-BR",
+            {},
+        )
+        self.assertEqual(sensor.native_value, expected_state)
+        self.assertEqual(set(sensor.extra_state_attributes), self.ALLOWED)
+
+
 @unittest.skipUnless(HA_AVAILABLE, "Home Assistant libraries are not installed")
 class DiagnosticsMaskingTest(unittest.TestCase):
-    """Ensure diagnostics do not expose complete skill IDs."""
+    """Ensure diagnostics do not expose complete skill IDs or secrets."""
+
+    MISTYPED_SECRET = "mistyped-secret-0123456789"
+    PASSWORD = "super-secret-password"
+    TOKEN = "ma-token-value-123"
 
     def test_skill_ids_are_masked(self) -> None:
         data = _data()
@@ -767,6 +1153,75 @@ class DiagnosticsMaskingTest(unittest.TestCase):
         self.assertNotIn(GOOD_ID, text)
         self.assertNotIn(OTHER_ID, text)
         self.assertIn("...", text)
+
+    def test_valid_ids_keep_the_existing_representation(self) -> None:
+        payload = _coordinator_data(_data(detected_skill_id=GOOD_ID))
+        masked = _mask_skill_id_fields(payload)
+        self.assertEqual(masked["detected_skill_id"], mask_skill_id(GOOD_ID))
+        self.assertEqual(masked["detected_skill_id"], mask_skill_identifier(GOOD_ID))
+        self.assertEqual(masked["configured_skill_id"], mask_skill_id(GOOD_ID))
+
+    def test_invalid_ids_become_fully_masked(self) -> None:
+        payload = _coordinator_data(
+            _data(
+                configured_skill_id=self.MISTYPED_SECRET,
+                detected_skill_id=self.MISTYPED_SECRET,
+                suggested_skill_id=self.MISTYPED_SECRET,
+            )
+        )
+        payload["entry"] = {"data": {"skill_id": self.MISTYPED_SECRET}}
+        masked = _mask_skill_id_fields(payload)
+        self.assertEqual(masked["configured_skill_id"], "***")
+        self.assertEqual(masked["detected_skill_id"], "***")
+        self.assertEqual(masked["suggested_skill_id"], "***")
+        self.assertEqual(masked["entry"]["data"]["skill_id"], "***")
+        text = repr(masked)
+        self.assertNotIn(self.MISTYPED_SECRET, text)
+        self.assertNotIn(self.MISTYPED_SECRET[:16], text)
+
+    def test_config_entry_diagnostics_hide_secrets(self) -> None:
+        entry = SimpleNamespace(
+            entry_id="entry-1",
+            data={"skill_id": GOOD_ID},
+            options={
+                "skill_id": OTHER_ID,
+                "password": self.PASSWORD,
+                "ma_api_token": self.TOKEN,
+                "skill_hostname": "skill.example.test",
+            },
+        )
+        runtime = SimpleNamespace(
+            coordinator=SimpleNamespace(data=_data()),
+            supervisor=SimpleNamespace(manager_ready=False),
+        )
+        hass = SimpleNamespace(data={DOMAIN: {entry.entry_id: runtime}})
+
+        result = asyncio.run(async_get_config_entry_diagnostics(hass, entry))
+
+        self.assertEqual(
+            result["coordinator"]["configured_skill_id"], mask_skill_id(GOOD_ID)
+        )
+        self.assertEqual(result["entry"]["data"]["skill_id"], mask_skill_id(GOOD_ID))
+        self.assertEqual(
+            result["entry"]["options"]["skill_id"], mask_skill_id(OTHER_ID)
+        )
+        self.assertEqual(
+            result["entry"]["options"]["skill_hostname"], "skill.example.test"
+        )
+        self.assertEqual(result["coordinator"]["http_status"], 200)
+        self.assertIs(result["addon"]["available"], False)
+
+        serialized = json.dumps(result, default=str)
+        for secret in (
+            GOOD_ID,
+            OTHER_ID,
+            self.PASSWORD,
+            self.TOKEN,
+            "super-secret",
+        ):
+            self.assertNotIn(secret, serialized)
+        self.assertIn("REDACTED", serialized)
+        self.assertTrue(TO_REDACT)
 
 
 @unittest.skipUnless(HA_AVAILABLE, "Home Assistant libraries are not installed")
