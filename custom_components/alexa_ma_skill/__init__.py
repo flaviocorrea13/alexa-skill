@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
 
 from .api import AlexaMaSkillApi
@@ -33,6 +34,7 @@ from .const import (
     STORAGE_VERSION,
 )
 from .coordinator import AlexaMaSkillCoordinator
+from .panel import async_register_panel, async_unregister_panel_if_empty
 from .setup import ChecklistManager
 from .supervisor import (
     AlexaMaSkillSupervisor,
@@ -41,8 +43,17 @@ from .supervisor import (
     addon_hostname,
 )
 from .util import entry_config
+from .websocket_api import async_register_websocket_commands
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
+    """Set up integration-level panel commands."""
+    async_register_websocket_commands(hass)
+    return True
 
 
 @dataclass(slots=True)
@@ -165,6 +176,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         supervisor=supervisor,
         checklist=checklist,
     )
+    await async_register_panel(hass)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -182,6 +194,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         domain_data.pop(entry.entry_id, None)
         if not domain_data:
             hass.data.pop(DOMAIN, None)
+        await async_unregister_panel_if_empty(hass)
     return unload_ok
 
 

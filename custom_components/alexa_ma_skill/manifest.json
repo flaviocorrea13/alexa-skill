@@ -2,12 +2,17 @@
   "domain": "alexa_ma_skill",
   "name": "Alexa MA Skill",
   "after_dependencies": [
-    "hassio"
+    "hassio",
+    "panel_custom"
   ],
   "codeowners": [
     "@flaviocorrea13"
   ],
   "config_flow": true,
+  "dependencies": [
+    "http",
+    "websocket_api"
+  ],
   "documentation": "https://github.com/flaviocorrea13/alexa-skill",
   "integration_type": "hub",
   "iot_class": "local_polling",

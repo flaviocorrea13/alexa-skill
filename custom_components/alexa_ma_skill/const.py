@@ -37,6 +37,14 @@ DEFAULT_SCAN_INTERVAL = 30
 MIN_SCAN_INTERVAL = 10
 MAX_SCAN_INTERVAL = 300
 
+PANEL_URL = "alexa-ma"
+PANEL_TITLE = "Alexa MA"
+PANEL_ICON = "mdi:amazon-alexa"
+PANEL_ELEMENT = "alexa-ma-panel"
+PANEL_FILENAME = "alexa-ma-panel.js"
+PANEL_STATIC_PATH = "/alexa-ma-panel"
+WS_PREFIX = "alexa_ma_skill"
+
 DETAILED_SCAN_INTERVAL = timedelta(minutes=5)
 REQUEST_TIMEOUT = 10
 DETAILED_REQUEST_TIMEOUT = 30
