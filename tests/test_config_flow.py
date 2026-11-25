@@ -8,7 +8,7 @@ The module is also import-safe when pytest or Home Assistant is not installed.
 from __future__ import annotations
 
 from typing import ClassVar
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 try:
     import pytest
@@ -129,9 +129,18 @@ if TEST_READY:
                 DOMAIN, context={"source": config_entries.SOURCE_USER}
             )
 
-        with patch(
-            "custom_components.alexa_ma_skill.config_flow.AlexaMaSkillApi.async_get_status",
-            return_value=SimpleStatus(http_status=200),
+        with (
+            patch(
+                "custom_components.alexa_ma_skill.config_flow.AlexaMaSkillApi.async_get_status",
+                return_value=SimpleStatus(http_status=200),
+            ),
+            # Creating the entry makes Home Assistant start its setup. Mock the
+            # coordinator's first refresh so that setup does not perform real
+            # HTTP requests after the config-flow patch above is still active.
+            patch(
+                "custom_components.alexa_ma_skill.coordinator.AlexaMaSkillCoordinator.async_config_entry_first_refresh",
+                new=AsyncMock(),
+            ),
         ):
             result = await hass.config_entries.flow.async_configure(
                 result["flow_id"],
@@ -149,6 +158,7 @@ if TEST_READY:
                     "ignore_https": False,
                 },
             )
+            await hass.async_block_till_done()
 
         assert result["type"] is FlowResultType.CREATE_ENTRY
         assert result["data"]["managed"] is False
