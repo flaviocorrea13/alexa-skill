@@ -26,3 +26,8 @@ Thumbs.db
 
 # Home Assistant local data
 config/
+
+# Frontend build artifacts
+node_modules/
+custom_components/alexa_ma_skill/frontend/.test-build/
+custom_components/alexa_ma_skill/frontend/.tsbuild/
