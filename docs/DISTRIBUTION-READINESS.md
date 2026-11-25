@@ -23,7 +23,7 @@ teste executado.
 | 9 | Testes automatizados executados | **CONCLUÍDO** | **56 testes e 26 subtestes** no Linux/CI (Python 3.14.10, HA 2026.10.4) | — |
 | 10 | Hassfest validado | **CONCLUÍDO** | job `hassfest` aprovado no run 45276992158 | — |
 | 11 | Requisitos HACS verificados | **PARCIAL** | HACS Action aprovada com ignores de metadados do GitHub | `brand/icon.png`, release e Action sem ignores para o catálogo padrão |
-| 12 | Repositório de add-ons validado | **PARCIAL** | metadados validados; tag/digest upstream confirmada no GHCR com `linux/amd64` e `linux/arm64` | Instalação da `0.2.0` não reexecutada |
+| 12 | Repositório de add-ons validado | **PARCIAL** | metadados validados; tag/digest upstream confirmada no GHCR com `linux/amd64` e `linux/arm64` | Instalação da `0.2.0` pelo add-on local ainda não reexecutada |
 | 13 | Arquiteturas documentadas | **CONCLUÍDO** | `amd64` e `aarch64` em `config.yaml`; matriz distingue declaração, índice OCI e execução | `aarch64` não executado |
 | 14 | Segurança revisada | **CONCLUÍDO** | validador de segredos/LF/links; actions fixadas por SHA; exposição documentada | Repetir antes de cada release |
 | 15 | Screenshots reais disponíveis | **BLOQUEADO** | `docs/images/README.md` lista as capturas | Sem instalação real disponível |
@@ -110,10 +110,15 @@ O add-on é distribuído pelo repositório de add-ons declarado em
 foram validados localmente; a tag/digest da imagem upstream foi confirmada no
 GHCR. A instalação da `0.2.0` pelo store continua pendente.
 
+Enquanto a `0.2.0` não estiver na `main`, a loja e o HACS personalizado
+entregam a versão da `main` (0.1.x). O teste da `0.2.0` deve usar o add-on
+**local** e a integração copiada do mesmo commit, conforme
+[`HAOS-TEST-PLAN.md`](HAOS-TEST-PLAN.md).
+
 ## Bloqueios para a primeira distribuição
 
-1. **Versão `0.2.0` não instalada em HA OS.** A evidência real disponível é da
-   `0.1.1`.
+1. **Versão `0.2.0` não instalada em HA OS.** Ela não está na `main`; a loja
+   entrega a `0.1.1`. Use o add-on local do commit de validação.
 2. **Teste ponta a ponta com Alexa e Music Assistant não executado na `0.2.0`.**
 3. **Backup e restauração não testados.**
 4. **`aarch64` sem execução real.**

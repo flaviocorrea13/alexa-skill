@@ -909,6 +909,10 @@ também passou com 0 erros.
   existe.
 - O HACS Action valida o repositório **remoto**; sem push, ele não enxerga o
   worktree atual.
+- A `0.2.0` está apenas no branch `validation/phase-4-ci`; loja e HACS
+  personalizado apontando para `main` entregam a 0.1.x. O teste manual usa
+  add-on **local** (`/addons` em HA 2026.10.x, `/local_apps` em 2026.11+) e
+  integração copiada do commit, conforme `docs/HAOS-TEST-PLAN.md`.
 - Add-on: `repository.yaml` na raiz e `alexa_ma_skill/config.yaml` com `slug`,
   `arch`, `ports`, `schema`, `watchdog`, `webui` e `backup: cold`.
 - A imagem upstream permanece

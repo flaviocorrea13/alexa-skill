@@ -83,6 +83,11 @@ O script roda 10 plugins e não substitui a action oficial (que inclui o plugin
 Evidências registradas em `AGENTS.md` a partir de uma instalação real anterior.
 **Não foram reexecutadas nesta etapa.**
 
+> Para testar a `0.2.0`, não use a loja/HACS apontando para `main`: eles
+> entregam a versão da `main` (0.1.x). O roteiro em
+> [`HAOS-TEST-PLAN.md`](HAOS-TEST-PLAN.md) instala o add-on **local** e a
+> integração copiada do commit `5b75b63`.
+
 | Item | Versão observada | Arquitetura | Ambiente | Resultado | Evidência | Pendência |
 |---|---|---|---|---|---|---|
 | Instalação e atualização do add-on | `0.1.1` | `amd64` | Home Assistant OS | **PARCIAL — OK** | relato em `AGENTS.md` §9.3 e §12 | Repetir com `0.2.0` |

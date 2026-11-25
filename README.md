@@ -131,6 +131,12 @@ realmente testado.
 
 ## Instalação
 
+> **Versão 0.2.0 em validação:** ela está no branch `validation/phase-4-ci` e
+> ainda não foi integrada à `main`. Instalar pela loja/HACS agora entrega a
+> versão da `main` (0.1.x), não a 0.2.0. Para testar a 0.2.0, use o add-on local
+> e a integração copiada do mesmo commit, conforme
+> [`docs/HAOS-TEST-PLAN.md`](docs/HAOS-TEST-PLAN.md).
+
 ### 1. Adicionar o repositório de add-ons
 
 1. Abra **Configurações > Add-ons > Loja de add-ons**.

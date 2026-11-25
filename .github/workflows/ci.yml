@@ -70,6 +70,43 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify panel bundle is tracked
+        run: git ls-files --error-unmatch custom_components/alexa_ma_skill/frontend/dist/alexa-ma-panel.js
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: custom_components/alexa_ma_skill/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: custom_components/alexa_ma_skill/frontend
+        run: npm ci
+
+      - name: Type-check frontend
+        working-directory: custom_components/alexa_ma_skill/frontend
+        run: npm run typecheck
+
+      - name: Run frontend tests
+        working-directory: custom_components/alexa_ma_skill/frontend
+        run: npm test
+
+      - name: Build frontend bundle
+        working-directory: custom_components/alexa_ma_skill/frontend
+        run: npm run build
+
+      - name: Verify committed bundle is current
+        run: git diff --exit-code -- custom_components/alexa_ma_skill/frontend/dist
+
   hassfest:
     name: Hassfest
     runs-on: ubuntu-latest
