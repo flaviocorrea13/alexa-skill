@@ -5,10 +5,11 @@ Add-on do Home Assistant que executa o contêiner do projeto
 expõe a skill Alexa usada para controlar o Music Assistant por voz.
 
 > **Escopo desta versão:** o **add-on** é o componente necessário. A integração
-> em `custom_components/alexa_ma_skill/` é **opcional**: está implementada,
-> incluindo o checklist de 16 etapas. CI, Hassfest e HACS Action passaram no
-> commit `ee16d8b` (run 45276992158); ainda faltam um teste dedicado do options
-> flow e a validação em HA OS. Consulte a
+> em `custom_components/alexa_ma_skill/` é **opcional** e inclui o checklist de
+> 16 etapas e o painel administrativo **Alexa MA**. CI, Hassfest e HACS Action
+> passaram nos cinco jobs do run `45716728724` (commit `8ab7492`). A `0.2.0` foi
+> instalada e testada em HA real; ainda faltam um teste dedicado do options flow
+> e validações de `aarch64`/backup. Consulte a
 > [`docs/VALIDATION-MATRIX.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/VALIDATION-MATRIX.md)
 > para o estado real das validações.
 
@@ -56,7 +57,8 @@ Add-ons instalados de um repositório personalizado recebem um prefixo
 
 O hostname interno do add-on é derivado do slug trocando `_` por `-`. A
 integração opcional usa este slug e hostname; ela está implementada e validada
-no CI Linux/Hassfest. A validação em HA OS ainda está pendente.
+no CI Linux/Hassfest e em HA real no fluxo principal e no painel. Options
+flow/reauth completos, `aarch64` e backup/restauração ainda estão pendentes.
 
 Exemplos:
 
@@ -130,6 +132,11 @@ A integração gerencia:
 desconhecidas também são preservadas porque o `AddonManager` mescla as opções
 atuais com as alterações.
 
+O options flow também permite ajustar o intervalo de atualização (10–300
+segundos) e `IGNORE_HTTPS`, que desativa a verificação de certificado apenas nas
+checagens de conectividade. Use `IGNORE_HTTPS` somente em cenários controlados
+de hairpin NAT ou certificados de teste.
+
 ### Segredos
 
 - Campos de senha e token vazios preservam o valor atual quando possível.
@@ -141,6 +148,29 @@ atuais com as alterações.
 - Alterações que exigem reinício mostram uma confirmação. Se o reinício for
   recusado ou falhar, as opções permanecem salvas e o add-on pode ser
   reiniciado manualmente.
+
+### Painel administrativo (Alexa MA)
+
+A integração registra o painel **Alexa MA** no menu lateral do Home Assistant,
+também acessível pelo caminho `/alexa-ma`.
+
+- O painel é visível apenas para administradores.
+- A visão geral é **somente leitura**: não inicia/para o add-on, não altera
+  opções e não controla a reprodução.
+- Quando há mais de uma config entry carregada, o painel mostra um seletor; com
+  uma entry, ela é selecionada automaticamente.
+- O botão **Atualizar** executa um refresh manual com cooldown de 5 segundos.
+  Cliques repetidos dentro do cooldown retornam o snapshot atual sem iniciar
+  outra atualização.
+- Erros são exibidos como estado do painel. Se a config entry selecionada for
+  removida, o painel recarrega a lista e seleciona a entry padrão/restante; se a
+  recarga falhar, mostra **Tentar novamente**.
+- O painel depende do add-on acessível para obter os dados. Com o add-on parado,
+  o setup da integração pode não concluir e o painel pode não aparecer; verifique
+  o add-on no Supervisor.
+
+O painel não expõe senhas, tokens, credenciais ASK, URLs de stream ou Skill IDs
+completos. Os dados vêm do coordinator e dos endpoints locais do add-on.
 
 ### Diagnóstico e entidades
 
@@ -363,10 +393,12 @@ Alterações de configuração invalidam apenas as etapas manuais dependentes:
   integração.
 - O teste de stream confirma HTTPS/resposta, não o conteúdo do áudio.
 - Testes de reprodução e comandos dependem de confirmação manual real.
-- Os testes de config flow e da suíte completa passaram no CI Linux (56 testes e
-  26 subtestes, commit `ee16d8b`); a execução no Windows com shims foi apenas
-  suplementar. Hassfest e HACS Action também passaram no CI. Ainda falta um
-  teste dedicado do options flow e a validação em HA OS.
+- Os testes de config flow e da suíte completa passaram no CI Linux (107 testes
+  e 26 subtestes, commit `8ab7492`), assim como os 38 testes de frontend. A
+  execução no Windows com shims foi apenas suplementar. Hassfest e HACS Action
+  também passaram. A `0.2.0` foi validada em HA real no fluxo principal e no
+  painel; ainda faltam teste E2E dedicado do options flow/reauth, `aarch64` e
+  backup/restauração.
 - A integração não gerencia `TZ` nem tenta recuperar segredos que o Supervisor
   mantém apenas em arquivos.
 - A versão mínima declarada em `hacs.json` é Home Assistant `2026.10.4`
@@ -1090,10 +1122,9 @@ Trate o backup como material sensível.
   hostname para a porta correta do Music Assistant.
 - O add-on não cria túneis, não emite certificados e não configura DNS.
 - Não há suporte a Nabu Casa.
-- A integração personalizada está implementada como camada opcional, incluindo
-  o setup assistido de 16 etapas, mas os testes completos de config flow/options
-  flow, Hassfest e HACS Action ainda não foram executados. O add-on já oferece
-  `/setup` e `/status`.
+- A integração personalizada e o painel foram instalados e testados em Home
+  Assistant real. O options flow completo e o reauth ainda não têm teste
+  end-to-end dedicado. O add-on também oferece `/setup` e `/status`.
 
 ## Validação e distribuição
 
@@ -1109,10 +1140,16 @@ O estado real das validações, com ambiente, evidência e pendências, está em
   rascunho da primeira release, **não publicado**;
 - [`docs/images/README.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/images/README.md) — capturas necessárias.
 
+A validação manual em Home Assistant real aprovou seis cenários: invocação sem
+música ativa, troca de música, pausa/retomada, próxima música, reprodução em
+múltiplos Echos e painel lateral. Esses testes foram executados pelo usuário e
+não fazem parte da CI.
+
 A CI fica em `.github/workflows/ci.yml` e executa, em Linux, validação de
-metadados, testes do add-on, testes da integração, ruff, Hassfest e HACS Action.
-A CI **foi configurada, não executada** neste ambiente. Ela não publica imagens,
-tags ou Releases.
+metadados, testes do add-on, testes da integração, ruff, testes/build do
+frontend, Hassfest e HACS Action. A execução `45716728724`, no commit `8ab7492`,
+aprovou os cinco jobs: 107 testes Linux, 26 subtests e 38 testes de frontend.
+Ela não publica imagens, tags ou Releases.
 
 ## Suporte
 

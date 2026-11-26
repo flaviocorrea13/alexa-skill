@@ -1,11 +1,13 @@
 # Roteiro de validação manual — Home Assistant OS (0.2.0)
 
-> **STATUS: NÃO EXECUTADO.** Este roteiro depende de uma instância isolada do
-> Home Assistant OS, Music Assistant, Echo, conta Amazon e túnel de teste.
-> Nenhum passo foi executado nesta máquina. Não execute nada em produção.
+> **STATUS: PARCIALMENTE EXECUTADO.** A `0.2.0` foi instalada e seis cenários
+> funcionais foram aprovados pelo usuário em Home Assistant real: invocação sem
+> música ativa, troca de música, pausa/retomada, próxima música, múltiplos Echos
+> e painel lateral. Backup/restauração, `aarch64`, atualização pela loja,
+> options flow/reauth e a matriz externa completa continuam pendentes.
 
 Este documento valida a versão **0.2.0 do commit
-`5b75b6341c2fe9a988ab354626909fc546628661`**, que está no branch
+`8ab74928d2004422a349d60cabf7672e75fccf5d`**, que está no branch
 `validation/phase-4-ci` e **ainda não foi integrada à `main`**.
 
 ## 1. Versão sob teste e canais de instalação
@@ -14,7 +16,7 @@ Este documento valida a versão **0.2.0 do commit
 |---|---|---|
 | Loja de add-ons apontando para `main` | Add-on **0.1.1** (a `main` remota ainda não tem a 0.2.0) | **Não** |
 | HACS/repositório personalizado apontando para `main` | Integração da `main`, não a do commit de validação | **Não** |
-| Add-on **local** a partir do commit `5b75b63` | Add-on **0.2.0** | **Sim** |
+| Add-on **local** a partir do commit `8ab7492` | Add-on **0.2.0** | **Sim** |
 | Integração copiada manualmente do mesmo commit | Integração **0.2.0** | **Sim** |
 | Release pública futura | 0.2.0 após merge/tag (não existe) | Ainda não |
 
@@ -62,7 +64,7 @@ Assistant, versão do Supervisor, túnel/proxy, data e responsável pelo teste.
 Baixe o arquivo do **commit**, não do branch (o branch pode avançar):
 
 ```text
-https://github.com/flaviocorrea13/alexa-skill/archive/5b75b6341c2fe9a988ab354626909fc546628661.tar.gz
+https://github.com/flaviocorrea13/alexa-skill/archive/8ab74928d2004422a349d60cabf7672e75fccf5d.tar.gz
 ```
 
 Alternativa com Git em um computador de apoio:
@@ -70,14 +72,14 @@ Alternativa com Git em um computador de apoio:
 ```sh
 git clone https://github.com/flaviocorrea13/alexa-skill.git
 cd alexa-skill
-git checkout 5b75b6341c2fe9a988ab354626909fc546628661
+git checkout 8ab74928d2004422a349d60cabf7672e75fccf5d
 git rev-parse HEAD
 ```
 
 O `git rev-parse HEAD` deve retornar exatamente:
 
 ```text
-5b75b6341c2fe9a988ab354626909fc546628661
+8ab74928d2004422a349d60cabf7672e75fccf5d
 ```
 
 Extraia o arquivo e localize:
@@ -100,7 +102,7 @@ Confirme em HAOS com `sha256sum` (ou `Get-FileHash` no Windows, após copiar):
 | `alexa_ma_skill/config.yaml` | `d92c11cf1284273b02a8a6f12e715bccb268dfc7ab87a74d460e4efd3cd9bb52` |
 | `alexa_ma_skill/run.sh` | `88388f3f32218a830563d984b50c98f2e43bbc4e342529c63f6ab43984b8aa4c` |
 | `alexa_ma_skill/addon_options.py` | `2b5653e83da4268a3414d89764e6047c0dcd3ef041169541d85c947874d1898c` |
-| `custom_components/alexa_ma_skill/manifest.json` | `7bf77c1c1f51494f188614c1922998ff11204a0601ebccd1a7d0526b7790faba` |
+| `custom_components/alexa_ma_skill/manifest.json` | `c89d7bf9fbbb451ce627cc8c8b4a10bbd87c852bd9017bc94b0ca1866e1bf5b0` |
 | `custom_components/alexa_ma_skill/api.py` | `e5d1d7498f280264cbf005a16ed799b89ef851a0549abf10433887f082a68e0f` |
 | `custom_components/alexa_ma_skill/setup.py` | `1a7f7a5d5231a694c4a93ecae4206004209f612ed0e81237b713ea8ba2ce2e88` |
 
@@ -189,7 +191,7 @@ Get-FileHash .\custom_components\alexa_ma_skill\manifest.json -Algorithm SHA256
 
 | Verificação | Como confirmar |
 |---|---|
-| Commit baixado | `git rev-parse HEAD` = `5b75b63...` ou arquivo do commit |
+| Commit baixado | `git rev-parse HEAD` = `8ab7492...` ou arquivo do commit |
 | Add-on | Página mostra `0.2.0`; hashes de `config.yaml`/`run.sh` conferem |
 | Integração | `manifest.json` mostra `0.2.0`; hash confere |
 | Slug local | `local_alexa_ma_skill` |
@@ -260,9 +262,12 @@ suportado é backup/restauração. Trate o backup como material sensível.
 4. Feche e reabra a tela e reinicie o HA: as confirmações devem persistir.
 5. Altere `SKILL_HOSTNAME` nas opções e confirme que apenas as etapas
    dependentes foram invalidadas (autorização Amazon preservada).
+6. Abra o painel **Alexa MA** no menu lateral ou em `/alexa-ma` com um usuário
+   administrador. Confirme a visão somente leitura, o seletor de config entry
+   quando aplicável, o refresh com cooldown, os estados de erro e a recuperação.
 
 **Evidência:** capturas do checklist, progresso e diagnóstico com `SKILL_ID`
-mascarado.
+mascarado; captura do painel sem dados sensíveis.
 
 ## 11. Music Assistant e Alexa
 
@@ -331,9 +336,11 @@ sensíveis).
 - `/setup` e `/status` acessíveis apenas na rede local.
 - Backup/restauração preservando credenciais ASK, painel e opções.
 - Setup assistido persistindo confirmações e invalidando apenas dependentes.
+- Painel administrativo acessível apenas para admin, somente leitura, com
+  refresh e recuperação funcionando.
 - Provider, stream na `8097`, API na `8095`, áudio e comandos funcionando.
 - Nenhum segredo em evidências.
-- `amd64` aprovado; `aarch64` executado ou explicitamente pendente.
+- Instalação real aprovada; `aarch64` executado ou explicitamente pendente.
 
 Se qualquer item falhar, registre a versão, o passo, a mensagem exata, o log
 revisado e os hashes dos arquivos antes de abrir uma issue.

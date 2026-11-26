@@ -8,15 +8,15 @@
 
 ## Título sugerido
 
-`Alexa MA Skill 0.2.0 — setup assistido, integração opcional e preparação para distribuição`
+`Alexa MA Skill 0.2.0 — setup assistido, integração opcional, painel administrativo e preparação para distribuição`
 
 ## Texto de apresentação
 
 O Alexa MA Skill executa a skill Alexa do Music Assistant no Home Assistant, sem
 Nabu Casa e sem serviços gerenciados pelo projeto. O add-on empacota a imagem
 upstream com credenciais persistentes, geração segura de senhas e diagnóstico; a
-integração personalizada opcional adiciona configuração pela interface e um
-checklist de 16 etapas.
+integração personalizada opcional adiciona configuração pela interface, um
+checklist de 16 etapas e um painel administrativo somente leitura.
 
 ## Mudanças confirmadas no código
 
@@ -29,6 +29,9 @@ checklist de 16 etapas.
 - Options flow com atualização parcial, preservação de opções desconhecidas e
   confirmação de reinício.
 - Sensores, binary sensors e diagnostics com `SKILL_ID` mascarado.
+- Painel administrativo **Alexa MA** no menu lateral (`/alexa-ma`), somente para
+  administradores, com visão geral somente leitura, seletor de config entry,
+  atualização manual com cooldown e recuperação de erros.
 - Setup assistido de 16 etapas, progresso, próxima ação e orientação de
   correção.
 - Persistência das confirmações manuais em `Store`, com invalidação seletiva.
@@ -39,8 +42,11 @@ checklist de 16 etapas.
 
 - `README.md` reestruturado como página pública do projeto.
 - `DOCS.md` com instalação, setup, provider Alexa, testes e recuperação.
-- `CHANGELOG.md` reorganizado por categorias.
+- `CHANGELOG.md` reorganizado por categorias e atualizado com o painel e as
+  validações automatizadas/manuais.
 - Versão do add-on e da integração alinhada em `0.2.0`.
+- `THIRD_PARTY_NOTICES.md` inclui o aviso BSD-3-Clause do Lit 3.3.3; o bundle
+  preserva o banner de licença.
 
 ### Corrigido
 
@@ -69,7 +75,10 @@ checklist de 16 etapas.
 ### Compatibilidade
 
 - Home Assistant mínimo declarado: `2026.10.4` (versão de desenvolvimento).
-- Arquiteturas declaradas no add-on: `amd64` e `aarch64`.
+- A `0.2.0` foi instalada e testada em Home Assistant real; a arquitetura exata
+  do teste não está registrada.
+- Arquiteturas declaradas no add-on: `amd64` e `aarch64`; `aarch64` ainda não
+  executado.
 - Music Assistant: sem versão mínima comprovada; declarada como pendência.
 - Não depende de Nabu Casa.
 
@@ -101,30 +110,40 @@ checklist de 16 etapas.
   ajustar para `Trusted` no console.
 - `MA_HOSTNAME` é necessário na prática para dispositivos sem tela e para capa.
 - O add-on não cria túneis, certificados ou DNS.
-- A integração é opcional e ainda não foi validada em HA OS.
+- A integração é opcional e foi validada em HA real no fluxo principal e no
+  painel; options flow/reauth completos ainda não têm teste E2E dedicado.
+- O painel depende do add-on acessível para obter dados.
 
 ## Pendências de validação antes da publicação
 
-- CI, Hassfest e HACS Action: **aprovados** no run 45276992158 (commit
-  `ee16d8b`).
-- `pytest` Linux: **56 testes e 26 subtestes aprovados** no CI.
-- Instalação da `0.2.0` em HA OS `amd64` e, se possível, `aarch64`.
-- Teste ponta a ponta com Alexa e Music Assistant na `0.2.0`.
-- Backup/restauração.
+- CI, Hassfest e HACS Action: **aprovados** no run `45716728724`, commit
+  `8ab7492`, 5/5 jobs.
+- `pytest` Linux: **107 testes e 26 subtestes aprovados**; frontend com **38
+  testes**.
+- Instalação e fluxo principal da `0.2.0`: **aprovados pelo usuário em HA real**,
+  incluindo os seis cenários funcionais.
+- Atualização `0.1.1 → 0.2.0` pela loja.
+- Backup/restauração e `aarch64`.
+- Options flow/reauth E2E e estados de erro/reconexão do painel.
 - `brand/icon.png` e uma Release completa para o catálogo padrão do HACS.
 - Captura das screenshots reais sem dados sensíveis.
-- Revisão final de segurança e de links.
+- Merge do PR #1 e criação da tag/Release.
 
 ## Checklist pré-publicação
 
-- [ ] CI verde no commit da release.
-- [ ] Hassfest verde.
-- [ ] HACS Action verde.
-- [ ] `pytest` completo aprovado em Linux.
-- [ ] Versão `0.2.0` consistente em `config.yaml`, `manifest.json` e CHANGELOG.
-- [ ] Instalação e atualização testadas em HA OS.
+- [ ] CI verde no commit **final** da release (o run `45716728724` aprovou
+  `8ab7492`; repetir após o diff documental).
+- [ ] Hassfest verde no commit final.
+- [ ] HACS Action verde no commit final.
+- [ ] `pytest` completo aprovado em Linux no commit final.
+- [x] Versão `0.2.0` consistente em `config.yaml`, `manifest.json` e CHANGELOG.
+- [x] Instalação e fluxo principal testados em HA real.
+- [x] Painel documentado no README/DOCS/CHANGELOG.
+- [x] Aviso BSD-3-Clause do Lit incorporado ao repositório e ao bundle.
+- [ ] Atualização pela loja testada.
+- [ ] Backup/restauração e `aarch64` validados.
 - [ ] `brand/icon.png` presente.
-- [ ] Matriz de validação atualizada com evidências.
+- [x] Matriz de validação atualizada com evidências.
 - [ ] Screenshots reais adicionadas em `docs/images/`.
 - [ ] Nenhum segredo em diff, logs, issues ou screenshots.
 - [ ] Release notes revisadas e autorizadas.

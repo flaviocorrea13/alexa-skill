@@ -17,6 +17,9 @@ descritas em `docs/DISTRIBUTION-READINESS.md`.
 - Options flow com atualização parcial, preservação de opções desconhecidas e
   confirmação antes de reiniciar o add-on.
 - Sensores, binary sensors e diagnostics com `SKILL_ID` mascarado.
+- Painel administrativo **Alexa MA** no menu lateral (`/alexa-ma`), somente para
+  administradores, com visão geral somente leitura, seleção de config entry,
+  atualização manual com cooldown e recuperação de erros.
 - Setup assistido de 16 etapas, com estados, progresso, dependências, próxima
   ação e orientação de correção.
 - Persistência das confirmações manuais em `Store`, com invalidação seletiva por
@@ -44,6 +47,8 @@ descritas em `docs/DISTRIBUTION-READINESS.md`.
   completos não são mais expostos nas entidades. Textos passam por sanitização
   e valores suspeitos são mascarados. O Options Flow continua usando os dados
   completos internamente por meio de `build_setup_checklist()`.
+- Bundle do painel passa a preservar o banner da licença BSD-3-Clause do Lit
+  3.3.3; o aviso integral foi incluído em `THIRD_PARTY_NOTICES.md`.
 - `pyproject.toml` centraliza a configuração de ruff e pytest.
 
 ### Corrigido
@@ -91,15 +96,26 @@ descritas em `docs/DISTRIBUTION-READINESS.md`.
 
 ### Pendente de validação
 
-- Instalação da `0.2.0` em Home Assistant OS `amd64` e `aarch64`.
-- Teste ponta a ponta com Alexa e Music Assistant na `0.2.0`.
-- Comandos de controle, backup/restauração e screenshots reais.
-- `brand/icon.png` e uma Release completa para o catálogo padrão do HACS.
+- Execução em `aarch64`.
+- Backup/restauração e atualização `0.1.1 → 0.2.0` pela loja.
+- Teste end-to-end dedicado do options flow e do reauth.
+- Screenshots reais, `brand/icon.png` e uma Release completa para o catálogo
+  padrão do HACS.
 
 ### Validação automatizada
 
-- CI do GitHub Actions aprovada no commit `ee16d8b` (run 45276992158): add-on,
-  56 testes Linux/HA, Hassfest e HACS Action.
+- CI do GitHub Actions aprovada no commit `8ab7492` (run `45716728724`): 5 jobs,
+  107 testes Linux/HA, 26 subtests e 38 testes de frontend.
+- Validação local suplementar no Windows: 106 testes aprovados, 1 ignorado e 26
+  subtests; typecheck, Ruff, formatação, `compileall`, `bash -n` e
+  `validate_repo.py` aprovados.
+
+### Validação manual
+
+- Em Home Assistant real, a `0.2.0` foi instalada e seis cenários funcionais
+  foram aprovados pelo usuário: invocação sem música ativa, troca de música,
+  pausa/retomada, próxima música, reprodução em múltiplos Echos e painel
+  lateral. Esses testes não fazem parte da CI.
 
 ## 0.1.1 - 2026-11-23
 

@@ -6,13 +6,56 @@ informativa; em caso de dúvida, o texto integral da licença prevalece.
 
 ## 1. Código original deste repositório
 
-O código original do add-on, dos scripts de entrada, dos documentos e da futura
+O código original do add-on, dos scripts de entrada, dos documentos e da
 integração é licenciado sob a **licença MIT**. Consulte o arquivo
 [`LICENSE`](LICENSE).
 
 Copyright (c) 2026 flaviocorrea13.
 
-## 2. Imagem base upstream: Amazon Software License 1.0
+## 2. Frontend: Lit 3.3.3
+
+O painel administrativo é compilado com **Lit 3.3.3** (pacote npm `lit`),
+distribuído no bundle `custom_components/alexa_ma_skill/frontend/dist/alexa-ma-panel.js`.
+A versão é fixada em `frontend/package.json` e `frontend/package-lock.json`.
+
+Lit é licenciado sob a **BSD 3-Clause License**. O texto integral, mantido
+conforme o pacote original, é:
+
+```text
+BSD 3-Clause License
+
+Copyright (c) 2017 Google LLC. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+O mesmo aviso é preservado como banner no bundle final, mesmo após a minificação
+com Terser.
+
+## 3. Imagem base upstream: Amazon Software License 1.0
 
 O add-on é construído a partir da imagem:
 
@@ -29,7 +72,7 @@ Essa imagem contém o projeto
 licenciado sob a **Amazon Software License 1.0** ("ASL 1.0"). O texto integral
 está em [`LICENSE-AMAZON-SOFTWARE-1.0`](LICENSE-AMAZON-SOFTWARE-1.0).
 
-### 2.1 O que é a ASL 1.0
+### 3.1 O que é a ASL 1.0
 
 A ASL 1.0 é uma licença de software disponibilizada pela Amazon. Ela **não é
 uma licença de código aberto aprovada pela OSI**, porque contém uma limitação
@@ -37,7 +80,7 @@ de área de uso (field-of-use). Ela permite usar, reproduzir, preparar obras
 derivadas, exibir, executar, sublicenciar e distribuir o Work, desde que as
 condições da licença sejam cumpridas.
 
-### 2.2 Concessões
+### 3.2 Concessões
 
 A ASL 1.0 concede:
 
@@ -50,7 +93,7 @@ A ASL 1.0 concede:
   Licensor que seriam infringidas pelo Work individualmente, excluindo
   combinações com outros materiais ou tecnologias.
 
-### 2.3 Condições de redistribuição
+### 3.3 Condições de redistribuição
 
 Se você redistribuir o Work ou uma obra derivada, a ASL 1.0 exige que você:
 
@@ -64,7 +107,7 @@ Se você aplicar termos adicionais ou diferentes às suas obras derivadas
 da Seção 3.3 e (b) identificarem especificamente quais obras derivadas estão
 sujeitas a eles. A ASL 1.0 continua aplicável ao Work original.
 
-### 2.4 Limitação de uso (Seção 3.3)
+### 3.4 Limitação de uso (Seção 3.3)
 
 A limitação mais importante da ASL 1.0 está na Seção 3.3:
 
@@ -77,7 +120,7 @@ plataforma da Amazon. O uso pretendido está alinhado com essa limitação. Não
 use o software upstream para fins não relacionados à Amazon sem antes avaliar
 a licença com cuidado.
 
-### 2.5 Patentes, marcas e rescisão
+### 3.5 Patentes, marcas e rescisão
 
 - Se você entrar com ou ameaçar entrar com uma reivindicação de patente contra
   um Licensor para fazer valer patentes que você alega serem infringidas pelo
@@ -88,7 +131,7 @@ a licença com cuidado.
 - A violação de qualquer termo da licença encerra imediatamente seus direitos
   sob ela.
 
-### 2.6 Garantias e responsabilidade
+### 3.6 Garantias e responsabilidade
 
 O Work é fornecido **"AS IS"**, sem garantias de qualquer tipo, expressas ou
 implícitas, incluindo comercialização, adequação a um propósito específico,
@@ -96,7 +139,7 @@ título ou não violação. A licença limita a responsabilidade dos Licensors p
 danos diretos, indiretos, especiais, incidentais ou consequenciais, na máxima
 extensão permitida pela lei aplicável.
 
-### 2.7 Como este repositório cumpre a ASL 1.0
+### 3.7 Como este repositório cumpre a ASL 1.0
 
 - O texto integral da ASL 1.0 é distribuído em
   [`LICENSE-AMAZON-SOFTWARE-1.0`](LICENSE-AMAZON-SOFTWARE-1.0).
@@ -106,7 +149,7 @@ extensão permitida pela lei aplicável.
 - A imagem base é referenciada por versão e digest, sem `:latest`.
 - O uso pretendido é a integração com a Alexa, uma plataforma da Amazon.
 
-## 3. Componentes de terceiros na imagem upstream
+## 4. Componentes de terceiros na imagem upstream
 
 A imagem upstream inclui, entre outros:
 
@@ -120,14 +163,14 @@ respectivos projetos e pela imagem upstream. Consulte o repositório upstream e
 os metadados da imagem para a lista completa. Este repositório não relicencia
 esses componentes.
 
-## 4. Music Assistant
+## 5. Music Assistant
 
 O **Music Assistant** é um projeto separado e não está incluído neste
 repositório nem na imagem do add-on. O add-on apenas se comunica com um servidor
 Music Assistant já instalado pelo usuário. Consulte o repositório do Music
 Assistant para os termos de licença aplicáveis.
 
-## 5. Marcas registradas
+## 6. Marcas registradas
 
 Amazon, Alexa, Amazon Web Services, AWS e nomes relacionados são marcas da
 Amazon.com, Inc. ou de suas afiliadas. Music Assistant e nomes relacionados
@@ -138,7 +181,7 @@ qualquer um de seus afiliados.
 O uso desses nomes é apenas descritivo, para identificar os serviços e
 plataformas com os quais o projeto é compatível.
 
-## 6. Se você redistribuir este add-on
+## 7. Se você redistribuir este add-on
 
 Se você publicar uma imagem ou um fork que inclua o Work upstream:
 
@@ -148,9 +191,11 @@ Se você publicar uma imagem ou um fork que inclua o Work upstream:
 4. identifique claramente quais partes são suas e quais vêm do upstream;
 5. revise as licenças dos componentes de terceiros incluídos na imagem.
 
-## 7. English summary
+## 8. English summary
 
-The original code in this repository is MIT-licensed. The upstream base image
+The original code in this repository is MIT-licensed. The frontend panel bundles
+Lit 3.3.3 under the BSD 3-Clause License; the full notice is in section 2 and in
+the generated bundle. The upstream base image
 (`ghcr.io/alams154/music-assistant-skill`) contains software licensed under the
 **Amazon Software License 1.0**, a source-available license with a field-of-use
 restriction. It is not an OSI-approved open-source license.

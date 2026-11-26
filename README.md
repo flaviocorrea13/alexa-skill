@@ -8,13 +8,15 @@ O Alexa MA Skill empacota a skill Alexa do Music Assistant em um add-on do Home
 Assistant. O add-on executa a aplicação upstream, mantém as credenciais do ASK
 CLI entre reinícios, gera senhas fortes quando necessário e expõe uma página de
 setup e diagnóstico na rede local. Uma integração personalizada **opcional**
-adiciona configuração pela interface e um checklist de configuração de 16 etapas.
+adiciona configuração pela interface, um checklist de configuração de 16 etapas
+e um painel administrativo somente leitura.
 
-> **Estado atual:** repositório em preparação para a primeira distribuição. Os
-> quatro jobs do CI (repositório/add-on, integração, Hassfest e HACS) passaram
-> no commit `ee16d8b`. O add-on tem evidência real de uso em Home Assistant OS
-> `amd64` com a versão `0.1.1`; a instalação da `0.2.0`, o `aarch64` e os testes
-> ponta a ponta com Alexa/Music Assistant ainda não foram executados. Leia a
+> **Estado atual:** `0.2.0` em validação no branch `validation/phase-4-ci`
+> (PR #1, Draft). A CI passou nos cinco jobs no commit `8ab7492`
+> (run `45716728724`): 107 testes Linux, 26 subtests e 38 testes de frontend.
+> A versão `0.2.0` foi instalada e testada em Home Assistant real; seis cenários
+> funcionais foram aprovados manualmente. `aarch64`, backup/restauração e
+> atualização pela loja ainda estão pendentes. Leia a
 > [matriz de validação](docs/VALIDATION-MATRIX.md) antes de instalar. Este
 > projeto **não** é afiliado à Amazon ou ao Music Assistant.
 
@@ -83,6 +85,8 @@ add-on Alexa MA Skill :5000                 Music Assistant :8097
 - Config flow gerenciado, manual e reauth.
 - Options flow com atualização parcial e preservação de opções desconhecidas.
 - Sensores, binary sensors e diagnóstico com IDs mascarados.
+- Painel administrativo **Alexa MA** no menu lateral, somente para
+  administradores, com visão geral somente leitura.
 - Setup assistido de 16 etapas, com progresso, dependências e confirmações
   manuais persistidas.
 
@@ -95,9 +99,9 @@ add-on Alexa MA Skill :5000                 Music Assistant :8097
 - Provider **Alexa** configurado no Music Assistant.
 - Habilitação da skill no aplicativo Alexa.
 
-### Experimentais ou não totalmente validadas
+### Parcialmente validadas
 
-- Integração personalizada no Home Assistant.
+- Options flow completo e reauth, que ainda não têm teste end-to-end dedicado.
 - Setup assistido e checklist.
 - Locales `fr-CA` e `nl-NL` na criação da skill.
 - Arquitetura `aarch64` em execução real.
@@ -108,7 +112,7 @@ add-on Alexa MA Skill :5000                 Music Assistant :8097
 - Criação, exclusão ou habilitação automática de skills na conta Amazon.
 - Criação de túneis, certificados ou registros DNS.
 - Suporte a Nabu Casa.
-- Painel web próprio para o checklist.
+- Edição do checklist fora do Options Flow.
 - Gerenciamento de múltiplas contas Amazon.
 
 ## Requisitos
@@ -123,7 +127,7 @@ add-on Alexa MA Skill :5000                 Music Assistant :8097
 | Dois hostnames públicos com HTTPS | `SKILL_HOSTNAME` e `MA_HOSTNAME` |
 | TLS | 1.2 ou superior; a imagem upstream não suporta TLS 1.3 |
 | Túnel ou reverse proxy | Fornecido pelo usuário |
-| Arquiteturas do add-on | `amd64` e `aarch64` declaradas; execução real comprovada apenas em `amd64` |
+| Arquiteturas do add-on | `amd64` e `aarch64` declaradas; execução real em HA feita, arquitetura não registrada; `aarch64` não executado |
 | Portas locais | `5000` (add-on), `8095` (API do MA), `8097` (stream do MA) |
 
 Consulte a [matriz de validação](docs/VALIDATION-MATRIX.md) para o que foi
@@ -131,11 +135,11 @@ realmente testado.
 
 ## Instalação
 
-> **Versão 0.2.0 em validação:** ela está no branch `validation/phase-4-ci` e
-> ainda não foi integrada à `main`. Instalar pela loja/HACS agora entrega a
-> versão da `main` (0.1.x), não a 0.2.0. Para testar a 0.2.0, use o add-on local
-> e a integração copiada do mesmo commit, conforme
-> [`docs/HAOS-TEST-PLAN.md`](docs/HAOS-TEST-PLAN.md).
+> **Versão 0.2.0 em validação:** ela está no branch `validation/phase-4-ci`
+> (PR #1, Draft), commit `8ab7492`, e ainda não foi integrada à `main`.
+> Instalar pela loja/HACS agora entrega a versão da `main` (0.1.x), não a
+> 0.2.0. Para testar a 0.2.0, use o add-on local e a integração copiada do mesmo
+> commit, conforme [`docs/HAOS-TEST-PLAN.md`](docs/HAOS-TEST-PLAN.md).
 
 ### 1. Adicionar o repositório de add-ons
 
@@ -180,6 +184,23 @@ catálogo padrão e ainda falta
 `custom_components/alexa_ma_skill/brand/icon.png`. A partir do Home Assistant
 2026.11, o HACS é distribuído como **Marketplace**; os nomes de menu podem
 variar.
+
+#### Painel administrativo
+
+A integração opcional registra o painel **Alexa MA**:
+
+- acesso pelo menu lateral do Home Assistant ou pelo caminho `/alexa-ma`;
+- visível apenas para administradores;
+- visão geral **somente leitura**, sem iniciar/parar o add-on, alterar opções ou
+  controlar a reprodução;
+- seletor de config entry quando houver mais de uma entry carregada;
+- atualização manual com cooldown de 5 segundos; cliques repetidos retornam o
+  snapshot atual sem iniciar outra atualização;
+- estados de erro e recuperação, incluindo a ação **Tentar novamente** quando a
+  lista de config entries precisa ser recarregada;
+- o painel depende do add-on acessível para obter os dados. Se o add-on estiver
+  parado, o setup da integração pode não concluir e o painel pode não aparecer;
+  nesse caso, verifique o estado do add-on no Supervisor.
 
 ### 4. Configuração inicial
 
@@ -367,25 +388,29 @@ Não há canal oficial de suporte por e-mail, Discord ou comunidade. O repositó
 
 | Item | Estado |
 |---|---|
-| CI (GitHub Actions) | **4 jobs aprovados** no run 45276992158 |
-| Suíte pytest no CI Linux | **56 testes e 26 subtestes aprovados** |
+| CI (GitHub Actions) | **5 jobs aprovados** no run `45716728724`, commit `8ab7492` |
+| Suíte pytest no CI Linux | **107 testes e 26 subtestes aprovados** |
+| Frontend | **38 testes aprovados**; typecheck e build aprovados |
 | Config flow (6 testes) | Aprovados no CI Linux |
 | Hassfest | **Aprovado no CI** |
 | HACS Action | **Aprovada no CI** (com ignores de metadados do GitHub) |
-| Add-on em HA OS `amd64` | Parcial — evidência real com a versão `0.1.1` |
+| Add-on `0.2.0` em HA real | **Instalado e testado**; seis cenários funcionais manuais aprovados pelo usuário |
+| Testes locais no Windows | **106 aprovados, 1 ignorado, 26 subtestes** (suplementar; não é CI) |
 | Add-on (unitários) | 16 testes locais aprovados (1 pulo POSIX) |
 | `aarch64` | Não executado |
-| Comandos, backup e restore | Pendentes |
+| Backup/restauração e atualização pela loja | Pendentes |
+| Catálogo padrão do HACS | Pendente de `brand/icon.png` e Release |
 
-Os testes locais no Windows usaram shims fora do repositório e são apenas
-suplementares. Não há screenshots reais e o ícone de marca do HACS ainda precisa
-ser adicionado.
+Os testes manuais foram realizados pelo usuário em Home Assistant real e não
+fazem parte da CI. Os testes locais no Windows usaram shims fora do repositório e
+são apenas suplementares. Não há screenshots reais e o ícone de marca do HACS
+ainda precisa ser adicionado.
 
 Detalhes e evidências em [docs/VALIDATION-MATRIX.md](docs/VALIDATION-MATRIX.md) e
 [docs/DISTRIBUTION-READINESS.md](docs/DISTRIBUTION-READINESS.md). O roteiro de
 validação em HA OS está em
-[docs/HAOS-TEST-PLAN.md](docs/HAOS-TEST-PLAN.md) — **não executado**. O rascunho
-da primeira release está em
+[docs/HAOS-TEST-PLAN.md](docs/HAOS-TEST-PLAN.md) — **parcialmente executado**
+(instalação e seis cenários funcionais). O rascunho da primeira release está em
 [docs/releases/RELEASE-DRAFT.md](docs/releases/RELEASE-DRAFT.md) — **não
 publicado**.
 
@@ -440,8 +465,9 @@ A imagem upstream é fixada por tag e digest no `FROM` do
 
 ## Licença
 
-O código original deste repositório é **MIT** ([`LICENSE`](LICENSE)). A imagem
-base upstream é licenciada sob a **Amazon Software License 1.0**
+O código original deste repositório é **MIT** ([`LICENSE`](LICENSE)). O painel
+frontend inclui **Lit 3.3.3** sob a **BSD 3-Clause License**. A imagem base
+upstream é licenciada sob a **Amazon Software License 1.0**
 ([`LICENSE-AMAZON-SOFTWARE-1.0`](LICENSE-AMAZON-SOFTWARE-1.0)). Consulte também
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
@@ -456,8 +482,8 @@ Amazon.com, Inc. ou de suas afiliadas.
 Alexa MA Skill runs the upstream Music Assistant Alexa skill inside a Home
 Assistant add-on, without Nabu Casa. It keeps ASK CLI credentials, generates
 panel passwords safely and exposes `/setup` and `/status` on the local network.
-An optional custom integration adds UI configuration and a 16-step setup
-checklist.
+An optional custom integration adds UI configuration, a 16-step setup checklist,
+and an admin-only read-only sidebar panel at `/alexa-ma`.
 
 Requirements: Home Assistant OS/Supervised, a Music Assistant instance, an
 Amazon developer account with Skill Access Management, two public HTTPS
@@ -469,9 +495,11 @@ Install the add-on from
 network. Expose only `POST /` publicly. Enable the skill in the Alexa app and
 say **"Alexa, open music assistant"**.
 
-Validation is partial: the add-on has real `amd64` evidence with `0.1.1`. CI
-passed on commit `ee16d8b` (add-on, 56 Linux tests, Hassfest and HACS Action).
-The 0.2.0 install, aarch64, and the Alexa/Music Assistant end-to-end tests are
-still pending. See
+Validation is partial but substantially complete: `0.2.0` was installed and
+tested on a real Home Assistant instance, and six manual scenarios passed
+(invocation without active music, track change, pause/resume, next track,
+multiple Echos, and the sidebar panel). CI passed all five jobs on commit
+`8ab7492` (run `45716728724`): 107 Linux tests, 26 subtests, and 38 frontend
+tests. `aarch64`, backup/restore, and a store upgrade remain pending. See
 [`docs/VALIDATION-MATRIX.md`](docs/VALIDATION-MATRIX.md) and
 [`alexa_ma_skill/DOCS.md`](alexa_ma_skill/DOCS.md).
