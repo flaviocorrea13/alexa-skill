@@ -30,6 +30,7 @@ try:
     )
     from custom_components.alexa_ma_skill.config_flow import (
         AlexaMaSkillOptionsFlow,
+        _clean_base_url,
         _clean_hostname,
         _clean_ma_api_url,
         _entry_title,
@@ -151,12 +152,58 @@ class ConfigFlowHelperTest(unittest.TestCase):
         self.assertEqual(_validate_ma_api_pair("", "", "existing"), "")
 
     def test_safe_input_redacts_credentials(self) -> None:
-        self.assertEqual(_safe_input("user:pass@example.com"), "***@example.com")
-        self.assertEqual(
-            _safe_input("https://user:pass@example.com"), "***@example.com"
-        )
-        self.assertEqual(_safe_input("example.com"), "example.com")
+        for value in (
+            "user:pass@example.com",
+            "https://user:pass@example.com",
+            "ftp://music.local?token=SEGREDO",
+            "https://user:pass@example.com/path?token=SEGREDO#fragment",
+            "https://example.com/path?token=SEGREDO",
+            "example.com?token=SEGREDO",
+            "token=SEGREDO",
+            "not-a-real-api-key",
+            "example.com",
+            "foo.bar",
+            "192.0.2.10",
+            "[malformed",
+            "a" * 121,
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(_safe_input(value), "***")
         self.assertEqual(_safe_input(None), "")
+
+    def test_error_placeholders_do_not_expose_secrets(self) -> None:
+        cases = (
+            (_clean_hostname, "ftp://music.local?token=SEGREDO"),
+            (
+                _clean_hostname,
+                "https://user:pass@example.com/path?token=SEGREDO",
+            ),
+            (_clean_base_url, "example.com"),
+            (_clean_base_url, "foo.bar"),
+            (
+                _clean_base_url,
+                "https://user:pass@example.com/path?token=SEGREDO",
+            ),
+            (_clean_ma_api_url, "ftp://music.local?token=SEGREDO"),
+            (
+                _clean_ma_api_url,
+                "https://user:pass@example.com/path?token=SEGREDO",
+            ),
+            (_clean_ma_api_url, "not-a-real-api-key"),
+        )
+        for validator, value in cases:
+            with self.subTest(value=value), self.assertRaises(_FlowError) as ctx:
+                validator(value)
+            placeholders = repr(ctx.exception.placeholders)
+            for forbidden in (
+                "example.com",
+                "foo.bar",
+                "not-a-real-api-key",
+                "SEGREDO",
+                "user:pass",
+            ):
+                self.assertNotIn(forbidden, placeholders)
+            self.assertEqual(ctx.exception.placeholders.get("host"), "***")
 
     def test_options_schema_optional_ma_hostname_and_selector(self) -> None:
         """The options schema follows the add-on schema and adds a slug selector."""

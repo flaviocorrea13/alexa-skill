@@ -94,14 +94,12 @@ class _FlowError(Exception):
 
 
 def _safe_input(value: Any) -> str:
-    """Return a short, credential-free representation for form errors."""
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    if "@" in text:
-        host = text.rsplit("@", 1)[1]
-        return f"***@{host[:120]}"
-    return text[:120]
+    """Return a generic, safe representation for form errors.
+
+    Never reproduce the supplied value, even when it looks like a hostname or
+    token. Only the distinction between an empty and a non-empty input remains.
+    """
+    return "***" if str(value or "").strip() else ""
 
 
 def _clean_hostname(value: Any, *, required: bool = True) -> str:
@@ -277,12 +275,12 @@ async def _async_check_https(
         async with async_get_clientsession(hass).get(url, **kwargs) as response:
             if expect_skill:
                 if response.status not in (200, 401, 403):
-                    raise _FlowError("https_unreachable", {"host": host})
+                    raise _FlowError("https_unreachable", {"host": _safe_input(host)})
             elif response.status >= 500:
-                raise _FlowError("https_unreachable", {"host": host})
+                raise _FlowError("https_unreachable", {"host": _safe_input(host)})
             return
     except (aiohttp.ClientError, TimeoutError, OSError) as err:
-        raise _FlowError("https_unreachable", {"host": host}) from err
+        raise _FlowError("https_unreachable", {"host": _safe_input(host)}) from err
 
 
 async def _async_wait_for_status(api: AlexaMaSkillApi) -> None:
@@ -534,7 +532,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             locale = str(user_input.get(CONF_LOCALE, DEFAULT_LOCALE))
             if locale not in ALLOWED_LOCALES:
-                raise _FlowError("invalid_hostname", {"host": locale})
+                raise _FlowError("invalid_hostname", {"host": _safe_input(locale)})
             enable_apl = bool(user_input.get(CONF_ENABLE_APL, False))
             skip_url_validation = bool(user_input.get(CONF_SKIP_URL_VALIDATION, False))
             ignore_https = bool(user_input.get(CONF_IGNORE_HTTPS, False))
@@ -761,7 +759,7 @@ class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             locale = str(user_input.get(CONF_LOCALE, DEFAULT_LOCALE))
             if locale not in ALLOWED_LOCALES:
-                raise _FlowError("invalid_hostname", {"host": locale})
+                raise _FlowError("invalid_hostname", {"host": _safe_input(locale)})
             enable_apl = bool(user_input.get(CONF_ENABLE_APL, False))
             skip_url_validation = bool(user_input.get(CONF_SKIP_URL_VALIDATION, False))
             ignore_https = bool(user_input.get(CONF_IGNORE_HTTPS, False))
@@ -1128,7 +1126,7 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
             )
             locale = str(user_input.get(CONF_LOCALE, DEFAULT_LOCALE))
             if locale not in ALLOWED_LOCALES:
-                raise _FlowError("invalid_hostname", {"host": locale})
+                raise _FlowError("invalid_hostname", {"host": _safe_input(locale)})
             enable_apl = bool(user_input.get(CONF_ENABLE_APL, False))
             skip_url_validation = bool(user_input.get(CONF_SKIP_URL_VALIDATION, False))
             skill_id = str(user_input.get(CONF_SKILL_ID) or "").strip()
