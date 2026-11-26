@@ -320,15 +320,29 @@ class SetupFlowTest(unittest.TestCase):
         async def async_save(self, data) -> None:
             self.saved = data
 
-    def test_setup_form_reads_and_stores_manual_steps(self) -> None:
-        manager = ChecklistManager(self.FakeStore(), {"confirmations": {}})
+    class BlockingCoordinator:
+        """Coordinator whose configured refresh call waits for a release."""
 
-        async def refresh() -> None:
-            return None
+        def __init__(self, data, updated, *, block_call: int = 1) -> None:
+            self.data = data
+            self.updated = updated
+            self.last_update_success = True
+            self.block_call = block_call
+            self.calls = 0
+            self.started = asyncio.Event()
+            self.release = asyncio.Event()
 
-        coordinator = SimpleNamespace(data=_data(), async_request_refresh=refresh)
-        runtime = SimpleNamespace(coordinator=coordinator, checklist=manager)
+        async def async_refresh(self) -> None:
+            self.calls += 1
+            if self.calls != self.block_call:
+                return
+            self.started.set()
+            await self.release.wait()
+            self.data = self.updated
+
+    def _make_flow(self, coordinator, manager):
         entry = SimpleNamespace(entry_id="entry", data={}, options={})
+        runtime = SimpleNamespace(coordinator=coordinator, checklist=manager)
         hass = SimpleNamespace(
             data={DOMAIN: {"entry": runtime}},
             config=SimpleNamespace(language="pt-BR"),
@@ -346,6 +360,28 @@ class SetupFlowTest(unittest.TestCase):
         }
         flow.async_show_menu = lambda **kwargs: {"type": "menu", **kwargs}
         flow.async_abort = lambda **kwargs: {"type": "abort", **kwargs}
+        return flow
+
+    @staticmethod
+    def _checklist_spy(calls):
+        def spy(config, data, language, confirmations):
+            calls.append(data)
+            return build_setup_checklist(config, data, language, confirmations)
+
+        return spy
+
+    def test_setup_form_reads_and_stores_manual_steps(self) -> None:
+        manager = ChecklistManager(self.FakeStore(), {"confirmations": {}})
+
+        async def refresh() -> None:
+            return None
+
+        coordinator = SimpleNamespace(
+            data=_data(),
+            async_refresh=refresh,
+            last_update_success=True,
+        )
+        flow = self._make_flow(coordinator, manager)
 
         result = asyncio.run(flow.async_step_setup(None))
         self.assertEqual(result["step_id"], "setup")
@@ -355,6 +391,120 @@ class SetupFlowTest(unittest.TestCase):
         result = asyncio.run(flow.async_step_setup({"local_setup": True}))
         self.assertTrue(manager.confirmed("local_setup"))
         self.assertEqual(result["step_id"], "setup")
+
+    def test_initial_open_waits_for_refresh_and_uses_updated_data(self) -> None:
+        old_data = _data()
+        new_data = _data(addon_version="9.9.9")
+        manager = ChecklistManager(self.FakeStore(), {"confirmations": {}})
+        coordinator = self.BlockingCoordinator(old_data, new_data)
+        flow = self._make_flow(coordinator, manager)
+        calls = []
+
+        async def scenario():
+            with patch(
+                "custom_components.alexa_ma_skill.config_flow.build_setup_checklist",
+                side_effect=self._checklist_spy(calls),
+            ):
+                task = asyncio.create_task(flow.async_step_setup(None))
+                await asyncio.wait_for(coordinator.started.wait(), timeout=1)
+                self.assertFalse(task.done())
+                self.assertEqual(calls, [])
+                coordinator.release.set()
+                return await asyncio.wait_for(task, timeout=1)
+
+        result = asyncio.run(scenario())
+
+        self.assertEqual(calls[-1], new_data)
+        self.assertEqual(result["step_id"], "setup")
+
+    def test_saving_waits_for_refresh_and_uses_updated_data(self) -> None:
+        old_data = _data()
+        new_data = _data(addon_version="9.9.9")
+        manager = ChecklistManager(self.FakeStore(), {"confirmations": {}})
+        coordinator = self.BlockingCoordinator(old_data, new_data, block_call=3)
+        flow = self._make_flow(coordinator, manager)
+        calls = []
+
+        async def scenario():
+            with patch(
+                "custom_components.alexa_ma_skill.config_flow.build_setup_checklist",
+                side_effect=self._checklist_spy(calls),
+            ):
+                await flow.async_step_setup(None)
+                self.assertEqual(calls, [old_data])
+                task = asyncio.create_task(flow.async_step_setup({"local_setup": True}))
+                await asyncio.wait_for(coordinator.started.wait(), timeout=1)
+                self.assertFalse(task.done())
+                self.assertTrue(manager.confirmed("local_setup"))
+                self.assertEqual(calls, [old_data, old_data])
+                coordinator.release.set()
+                return await asyncio.wait_for(task, timeout=1)
+
+        result = asyncio.run(scenario())
+
+        self.assertEqual(calls, [old_data, old_data, new_data])
+        self.assertTrue(manager.confirmed("local_setup"))
+        self.assertEqual(result["step_id"], "setup")
+
+    def test_refresh_exception_keeps_form_usable_and_logs_warning(self) -> None:
+        data = _data()
+        manager = ChecklistManager(self.FakeStore(), {"confirmations": {}})
+        calls = []
+
+        async def failing_refresh() -> None:
+            raise RuntimeError("offline")
+
+        coordinator = SimpleNamespace(
+            data=data,
+            async_refresh=failing_refresh,
+            last_update_success=True,
+        )
+        flow = self._make_flow(coordinator, manager)
+
+        with (
+            patch(
+                "custom_components.alexa_ma_skill.config_flow.build_setup_checklist",
+                side_effect=self._checklist_spy(calls),
+            ),
+            self.assertLogs(
+                "custom_components.alexa_ma_skill.config_flow", level="WARNING"
+            ) as logs,
+        ):
+            result = asyncio.run(flow.async_step_setup(None))
+
+        self.assertEqual(result["step_id"], "setup")
+        self.assertEqual(calls, [data])
+        self.assertTrue(any("failed" in line for line in logs.output))
+
+    def test_failed_refresh_state_keeps_form_usable_and_logs_warning(self) -> None:
+        data = _data()
+        manager = ChecklistManager(self.FakeStore(), {"confirmations": {}})
+        calls = []
+
+        async def refresh() -> None:
+            return None
+
+        coordinator = SimpleNamespace(
+            data=data,
+            async_refresh=refresh,
+            last_update_success=False,
+        )
+        flow = self._make_flow(coordinator, manager)
+
+        with (
+            patch(
+                "custom_components.alexa_ma_skill.config_flow.build_setup_checklist",
+                side_effect=self._checklist_spy(calls),
+            ),
+            self.assertLogs(
+                "custom_components.alexa_ma_skill.config_flow", level="WARNING"
+            ) as logs,
+        ):
+            result = asyncio.run(flow.async_step_setup(None))
+
+        self.assertEqual(result["step_id"], "setup")
+        self.assertEqual(calls, [data])
+        self.assertTrue(any("outdated" in line for line in logs.output))
 
 
 @unittest.skipUnless(HA_AVAILABLE, "Home Assistant libraries are not installed")

@@ -384,6 +384,32 @@ def _addon_selector(candidates: list[AddonCandidate]) -> SelectSelector:
     )
 
 
+async def _async_refresh_checklist(runtime: Any, *, stage: str) -> None:
+    """Refresh the coordinator before building the checklist.
+
+    ``async_request_refresh`` may return before the debounced update runs, so
+    the checklist could be built from stale data. ``async_refresh`` waits for
+    the public coordinator update to finish. A failure must not block the flow,
+    but it must be logged so the form is not treated as successfully refreshed.
+    """
+    try:
+        await runtime.coordinator.async_refresh()
+    except Exception as err:  # noqa: BLE001 - keep the checklist usable
+        _LOGGER.warning(
+            "Checklist refresh %s failed; using the last known data: %s",
+            stage,
+            type(err).__name__,
+        )
+        return
+
+    if not runtime.coordinator.last_update_success:
+        _LOGGER.warning(
+            "Checklist refresh %s did not complete successfully; "
+            "the checklist may show outdated data",
+            stage,
+        )
+
+
 class AlexaMaSkillConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the Alexa MA Skill config flow."""
 
@@ -1301,13 +1327,7 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
         if runtime is None:
             return self.async_abort(reason="not_loaded")
 
-        try:
-            await runtime.coordinator.async_request_refresh()
-        except Exception as err:  # noqa: BLE001 - show the checklist regardless
-            _LOGGER.debug(
-                "Checklist refresh failed, using the last known data: %s",
-                type(err).__name__,
-            )
+        await _async_refresh_checklist(runtime, stage="before opening")
         config = entry_config(self.config_entry)
         _state, attrs = build_setup_checklist(
             config,
@@ -1329,13 +1349,7 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
                     for dependency in step["dependencies"]
                 ):
                     await runtime.checklist.async_set(step["id"], True)
-            try:
-                await runtime.coordinator.async_request_refresh()
-            except Exception as err:  # noqa: BLE001 - keep the checklist usable
-                _LOGGER.debug(
-                    "Checklist refresh after saving failed: %s",
-                    type(err).__name__,
-                )
+            await _async_refresh_checklist(runtime, stage="after saving")
             if user_input.get("back_to_menu"):
                 return await self.async_step_init()
             _state, attrs = build_setup_checklist(
