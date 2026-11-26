@@ -12,8 +12,8 @@ adiciona configuração pela interface, um checklist de configuração de 16 eta
 e um painel administrativo somente leitura.
 
 > **Estado atual:** `0.2.0` em validação no branch `validation/phase-4-ci`
-> (PR #1, Draft). A CI passou nos cinco jobs no commit `8ab7492`
-> (run `45716728724`): 107 testes Linux, 26 subtests e 38 testes de frontend.
+> (PR #1, Draft). A CI passou nos cinco jobs no commit `99565ca`
+> (run `45855227918`): 107 testes Linux, 26 subtests e 38 testes de frontend.
 > A versão `0.2.0` foi instalada e testada em Home Assistant real; seis cenários
 > funcionais foram aprovados manualmente. `aarch64`, backup/restauração e
 > atualização pela loja ainda estão pendentes. Leia a
@@ -136,7 +136,7 @@ realmente testado.
 ## Instalação
 
 > **Versão 0.2.0 em validação:** ela está no branch `validation/phase-4-ci`
-> (PR #1, Draft), commit `8ab7492`, e ainda não foi integrada à `main`.
+> (PR #1, Draft), commit `99565ca`, e ainda não foi integrada à `main`.
 > Instalar pela loja/HACS agora entrega a versão da `main` (0.1.x), não a
 > 0.2.0. Para testar a 0.2.0, use o add-on local e a integração copiada do mesmo
 > commit, conforme [`docs/HAOS-TEST-PLAN.md`](docs/HAOS-TEST-PLAN.md).
@@ -388,7 +388,7 @@ Não há canal oficial de suporte por e-mail, Discord ou comunidade. O repositó
 
 | Item | Estado |
 |---|---|
-| CI (GitHub Actions) | **5 jobs aprovados** no run `45716728724`, commit `8ab7492` |
+| CI (GitHub Actions) | **5 jobs aprovados** no run `45855227918`, commit `99565ca` |
 | Suíte pytest no CI Linux | **107 testes e 26 subtestes aprovados** |
 | Frontend | **38 testes aprovados**; typecheck e build aprovados |
 | Config flow (6 testes) | Aprovados no CI Linux |
@@ -499,7 +499,7 @@ Validation is partial but substantially complete: `0.2.0` was installed and
 tested on a real Home Assistant instance, and six manual scenarios passed
 (invocation without active music, track change, pause/resume, next track,
 multiple Echos, and the sidebar panel). CI passed all five jobs on commit
-`8ab7492` (run `45716728724`): 107 Linux tests, 26 subtests, and 38 frontend
+`99565ca` (run `45855227918`): 107 Linux tests, 26 subtests, and 38 frontend
 tests. `aarch64`, backup/restore, and a store upgrade remain pending. See
 [`docs/VALIDATION-MATRIX.md`](docs/VALIDATION-MATRIX.md) and
 [`alexa_ma_skill/DOCS.md`](alexa_ma_skill/DOCS.md).

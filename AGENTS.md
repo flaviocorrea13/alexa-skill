@@ -16,9 +16,10 @@ A solução prevê duas partes:
    persistentes, geração segura de senhas e documentação de exposição pública.
 2. **Integração personalizada** (`custom_components/`, Fase 2): camada opcional
    para configurar o add-on pela interface do Home Assistant, reportar
-   diagnóstico e guiar o setup da skill Alexa. Está implementada, mas os testes
-   completos em Linux e o Hassfest ainda estão pendentes; não é necessária para
-   o add-on.
+   diagnóstico e guiar o setup da skill Alexa. Está implementada; config flow,
+   testes Linux, Hassfest e HACS Action passaram, e o fluxo principal e o painel
+   foram validados em HA real. Options flow E2E, `aarch64` e backup/restauração
+   continuam pendentes; não é necessária para o add-on.
 
 O add-on e a integração são peças separadas. Uma integração do Home Assistant
 **não pode iniciar contêineres**; ela configura o add-on via Supervisor/opções
@@ -47,10 +48,11 @@ e consulta o serviço interno.
 
 ### 2.2 Integração personalizada (Fase 2)
 
-Implementada como camada **opcional**, mas ainda **não validada** por testes
-completos em Linux/Hassfest. O add-on funciona sem ela. A Fase 2 só pode ser
-considerada concluída após os testes de config flow/options flow passarem no CI,
-Hassfest e revisão de segurança final.
+Implementada como camada **opcional**. Config flow, CI Linux, Hassfest e HACS
+Action foram aprovados, e o fluxo principal e o painel foram validados em HA
+real. O add-on funciona sem ela. A Fase 2 ainda não é declarada completa porque
+falta o teste E2E dedicado do options flow/reauth, `aarch64` e
+backup/restauração.
 
 - Fica em `custom_components/alexa_ma_skill/`.
 - Configura o add-on pela UI do Home Assistant (config flow).
@@ -291,8 +293,9 @@ credenciais geradas e o token do MA. Tratar backups como material sensível.
 ### 7.1 Fase 2 — integração personalizada
 
 Implementada, **opcional**, com testes de helpers e config flow aprovados no CI
-Linux, Hassfest e HACS Action aprovados. Falta um teste dedicado do options flow
-e a validação em HA OS.
+Linux, Hassfest e HACS Action aprovados. A `0.2.0` foi instalada e o fluxo
+principal e o painel foram validados em HA real. Faltam o teste E2E dedicado do
+options flow/reauth, `aarch64` e backup/restauração.
 
 - `custom_components/alexa_ma_skill/` com `manifest.json` existe.
 - Config flow pela UI do Home Assistant existe, incluindo descoberta de slug,
@@ -302,19 +305,22 @@ e a validação em HA OS.
 - Orientação do setup da skill existe no código.
 - **Usar os helpers do componente `hassio` em vez de HTTP cru no Supervisor**
   foi implementado; a dependência declarada é `after_dependencies`.
-- Compatibilidade HACS ainda não validada (`hacs.json` existe na raiz).
+- HACS Action executada e aprovada com ignores de metadados do GitHub; a
+  inclusão no catálogo padrão continua pendente (`brand/icon.png` e Release).
 - O add-on é consultado no hostname derivado do slug do Supervisor, por
   exemplo `http://0a1b2c3d-alexa-ma-skill:5000`.
 - O acesso ao setup é local:
   `http://<IP_DO_HOME_ASSISTANT>:5000/setup`. A URL pública
   `https://<SKILL_HOSTNAME>/setup` é bloqueada e não deve ser usada.
-- Pendente: executar `tests/test_config_flow.py` no Linux, Hassfest/HACS,
-  validação em HA OS e revisão de segurança final.
+- Pendente: teste E2E dedicado do options flow/reauth, `aarch64`,
+  backup/restauração, atualização pela loja, screenshots e catálogo padrão do
+  HACS.
 
 ### 7.2 Fase 3 — setup assistido
 
-Implementado no código, **opcional**; testes de helpers aprovados, validação
-completa em Linux/HA pendente.
+Implementado no código, **opcional**; testes de helpers aprovados e fluxo
+principal/painel validados em HA real. O teste E2E dedicado do options flow/reauth
+continua pendente.
 
 - Checklist de 16 etapas com estados, progresso e próxima ação.
 - Modelo distingue etapas automáticas e manuais.
@@ -325,15 +331,17 @@ completa em Linux/HA pendente.
 - `SKILL_ID` detectado/configurado/sugerido e `binary_sensor.skill_id_valid`.
 - Instruções do provider Alexa do MA, portas `5000`, `8095` e `8097`.
 - Testes de reprodução e comandos dependem de confirmação manual real.
-- Pendente: executar config flow/options flow no Linux, Hassfest, HACS Action,
-  CI e validação em HA OS.
+- Pendente: teste E2E do options flow/reauth, `aarch64`, backup/restauração,
+  atualização pela loja, screenshots e catálogo padrão do HACS.
 
 ### 7.3 Fase 4 — distribuição
 
 Preparada, **não publicada**. Documentação, validador local, CI, templates,
 matriz de validação, checklist de prontidão e rascunho de release existem.
-Hassfest, HACS Action, `pytest` no Linux, instalação da `0.2.0` em HA OS e
-screenshots reais continuam pendentes. Ver seção 15.
+Hassfest, HACS Action e `pytest` no Linux foram aprovados; a `0.2.0` foi
+instalada e o fluxo principal/painel validados em HA real. Continuam pendentes
+`aarch64`, backup/restauração, atualização pela loja, options flow/reauth E2E,
+screenshots e catálogo padrão do HACS. Ver seção 15.
 
 ## 8. Regras de implementação
 
@@ -426,53 +434,56 @@ worktree local e **fora do repositório público/PR**.
   descoberta de slug, validação de hostname/URL, preservação de opções,
   parsing de `/status`/`/setup`, checklist, sensores, diagnostics e lógica do
   coordinator. Executado com `.venv` no Windows.
-- `tests/test_config_flow.py`: escrito para o harness Linux do Home Assistant,
-  mas **não executado** no Windows. Apenas `--collect-only`: 6 testes coletados.
-- Em 23/11/2026, para validação operacional da Fase 4, a suíte foi executada no
-  Windows com shims `fcntl`/`resource` e sockets habilitados, mantidos **fora do
-  repositório**: **6 config flow OK** e **55 passed, 1 skipped, 26 subtests** no
-  `pytest` completo. Isso é evidência suplementar, **não** substitui Linux/CI.
+- `tests/test_config_flow.py`: escrito para o harness Linux do Home Assistant.
+  Os 6 testes passam no CI Linux; a execução no Windows com shims é apenas
+  suplementar.
+- Para validação operacional, a suíte foi executada no Windows com shims
+  `fcntl`/`resource` e sockets habilitados, mantidos **fora do repositório**:
+  **106 passed, 1 skipped, 26 subtests** e **6 config flow OK**. Isso é evidência
+  suplementar, **não** substitui Linux/CI.
 - `scripts/validate_repo.py`: valida metadados, versões, manifestos, links,
   traduções (URLs/HTML/placeholders), steps/menu do config flow, LF e padrões de
   segredo. A auditoria estática do Hassfest corrigiu a ordem do `manifest.json`
   e removeu URLs das traduções.
 - Hassfest: **10 plugins oficiais** (HA Core `2026.10.4`) passaram localmente
   com 0 erros; a execução oficial da imagem, incluindo `dependencies`, passou no
-  CI (run 45276992158).
+  CI no run `45855227918` (commit `99565ca`).
 - CI Linux, Hassfest e HACS Action: **executados e aprovados** no commit
-  `ee16d8b` (run 45276992158). O job de integração aprovou 56 testes e 26
-  subtestes. A autenticação básica deixou de usar `aiohttp.BasicAuth` depreciado
-  e as actions foram atualizadas para versões Node 24.
+  `99565ca` (run `45855227918`, 5/5 jobs). O job de integração aprovou 107 testes
+  e 26 subtestes; o frontend aprovou 38 testes. A autenticação básica deixou de
+  usar `aiohttp.BasicAuth` depreciado e as actions foram atualizadas para versões
+  Node 24.
 - Verificação de LF.
-- Em HA OS real, com evidência do usuário: add-on `0.1.1` instalado e
-  atualizado pela loja, `/setup` reutilizou a skill, provider Alexa do Music
-  Assistant configurado, áudio e invocação `music assistant` funcionaram em um
-  Echo Cozinha. Isso não cobre a matriz completa de testes manuais.
-- A versão candidata `0.2.0` **não foi instalada** em HA OS nesta etapa.
+- Em HA real, com evidência do usuário, a `0.2.0` foi instalada e testada. Foram
+  aprovados seis cenários: invocação sem música ativa, troca de música,
+  pausa/retomada, próxima música, reprodução em múltiplos Echos e painel
+  lateral. A evidência histórica da `0.1.1` em HA OS permanece registrada, mas
+  não é a validação atual.
 
-Build Docker e testes em HA OS ainda são manuais; não há Docker/HA OS no
-ambiente de desenvolvimento usado até agora.
+O build do add-on foi executado pelo Supervisor na instalação real; não há
+Docker local nem job de build na CI. `aarch64`, backup/restauração e atualização
+pela loja continuam pendentes.
 
-### 9.4 Testes manuais pendentes
+### 9.4 Testes manuais
 
-O checklist completo está no final da entrega da Fase 1 e em `DOCS.md`.
-Cobrir, no mínimo:
+Já aprovados pelo usuário em HA real com a `0.2.0`:
 
-- instalação e validação do formulário de opções;
-- bloqueio sem `SKILL_HOSTNAME` e rejeição de hostname com esquema;
-- geração, leitura e reuso das credenciais;
-- symlink `/root/.ask` e persistência de `/data/ask`;
-- `/setup` e `/status` com basic auth;
-- `POST /` sem basic auth, mas com validação de assinatura da Alexa;
-- setup completo na Amazon, `Done. Skill ID`, habilitação da skill;
-- regra Cloudflare bloqueando tudo exceto `POST /`;
-- matriz externa de `/setup`, `/status`, `/devices`, `/docs`, `/ma` e `/alexa`;
-- provider Alexa do Music Assistant e `/ma/latest-url`;
-- áudio via `MA_HOSTNAME` e comandos via `MA_API_URL` (e `MA_API_TOKEN`
-  quando a API exigir autenticação);
-- Echo com tela e Echo sem tela;
+- invocação sem música ativa;
+- troca de música;
+- pausa e retomada;
+- próxima música;
+- reprodução em múltiplos Echos;
+- painel lateral do Home Assistant.
+
+Ainda pendentes de validação manual:
+
 - backup/restauração `cold`;
-- build/início em `amd64` e `aarch64`.
+- atualização `0.1.1 → 0.2.0` pela loja;
+- `aarch64`;
+- options flow/reauth completos;
+- estados de erro e reconexão do painel;
+- exposição externa/WAF completa;
+- screenshots reais sem dados sensíveis.
 
 ## 10. Comandos úteis
 
@@ -519,7 +530,7 @@ A suíte completa do Home Assistant **não roda no Windows**: o
 
 > Exceção registrada na validação da Fase 4: uma execução suplementar no Windows
 > usou shims `fcntl`/`resource` e sockets habilitados, mantidos **fora do
-> repositório**. Ela produziu 6 config flow OK e 55 passed/1 skipped/26 subtests,
+> repositório**. Ela produziu 6 config flow OK e 106 passed/1 skipped/26 subtests,
 > mas **não é reproduzível pelo projeto nem substitui** a CI Linux. Não adicione
 > esses shims ao repositório.
 
@@ -534,8 +545,9 @@ Validação local no Windows:
   `.venv/Scripts/python.exe -m unittest tests.test_integration_helpers`
 
 O `pytest` completo da integração roda no CI Linux. O workflow está em
-`.github/workflows/ci.yml` e já foi executado com sucesso no run 45276992158
-(commit `ee16d8b`): 56 testes e 26 subtestes. O pacote é
+`.github/workflows/ci.yml` e foi executado com sucesso no run `45855227918`
+(commit `99565ca`, 5/5 jobs): 107 testes e 26 subtestes, além de 38 testes de
+frontend. O pacote é
 `pytest-homeassistant-custom-component==0.13.375` (Home Assistant 2026.10.4,
 Python >= 3.14). `tests/conftest.py` registra o plugin do
 harness e `pyproject.toml` define `asyncio_mode = "auto"`.
@@ -556,8 +568,8 @@ uv run pytest -q
 ```
 
 Ajuste o Python/venv se a distro já tiver 3.14. `requirements_test.txt` e a
-pasta `tests/` já existem; a suíte completa de config flow/options flow ainda
-precisa ser executada (localmente via WSL ou no CI Linux).
+pasta `tests/` já existem; o config flow e a suíte completa passam no CI Linux.
+O teste E2E dedicado do options flow/reauth ainda precisa ser adicionado.
 
 Leitura das credenciais geradas (HA OS com acesso ao host):
 
@@ -752,9 +764,9 @@ itens abaixo são fatos observados e não devem ser revertidos sem novo teste.
 - `.venv/Scripts/python.exe -m unittest tests.test_integration_helpers`:
   helpers da integração com bibliotecas do HA.
 - `python -m pytest tests/test_config_flow.py`: harness Linux do HA.
-- Pendente: executar config flow/options flow completos no Linux, Hassfest,
-  HACS Action, CI e validação em HA OS.
-- Fase 3 implementada no código; validação completa pendente.
+- Pendente: teste E2E do options flow/reauth, `aarch64`, backup/restauração,
+  atualização pela loja, screenshots e catálogo padrão do HACS.
+- Fase 3 implementada no código; fluxo principal/painel validados em HA real.
 
 ## 14. Setup assistido (Fase 3)
 
@@ -818,7 +830,8 @@ dependentes, para não reutilizar confirmação fora de contexto.
 
 - `tests/test_integration_helpers.py` cobre IDs, progresso, estados,
   persistência, invalidação seletiva, parsing e segurança.
-- O options flow completo ainda depende do harness Linux.
+- O options flow completo ainda não tem teste E2E dedicado; os seis cenários
+  manuais não cobrem esse fluxo.
 - Testes de reprodução/comandos e provider exigem HA OS, MA e Echo reais.
 
 ## 15. Fase 4 — distribuição e CI
@@ -830,7 +843,8 @@ dependentes, para não reutilizar confirmação fora de contexto.
   `alexa_ma_skill/CHANGELOG.md`.
 - O add-on não declara `image:`; o Supervisor constrói a imagem localmente a
   partir do `Dockerfile`. Não é necessário publicar imagem para testar a versão.
-- A `0.2.0` **não foi publicada, tagueada ou instalada** em HA OS.
+- A `0.2.0` **não foi publicada nem tagueada**, mas foi instalada e testada em
+  HA real; o fluxo principal e o painel foram validados pelo usuário.
 - `scripts/validate_repo.py` falha se as três versões divergirem ou se o
   CHANGELOG não tiver a seção correspondente.
 
@@ -862,8 +876,10 @@ dependentes, para não reutilizar confirmação fora de contexto.
    `ruff check` e `ruff format --check`.
 2. `integration`: instala `requirements_test.txt` e roda `python -m pytest -q`
    com `tests/conftest.py` e o harness do Home Assistant.
-3. `hassfest`: `home-assistant/actions/hassfest@<sha>` (fixado por commit).
-4. `hacs`: `hacs/action@<sha>` com `category: integration`,
+3. `frontend`: verifica o bundle rastreado, roda `npm ci`, typecheck, testes,
+   build e confirma que o `dist` versionado está atualizado.
+4. `hassfest`: `home-assistant/actions/hassfest@<sha>` (fixado por commit).
+5. `hacs`: `hacs/action@<sha>` com `category: integration`,
    `ignore: brands description issues topics` (separado por espaço) e
    `comment: "false"`.
 
@@ -874,8 +890,9 @@ mantenedores; o SHA fixa o repositório da action, mas a imagem Docker referenci
 internamente continua sendo resolvida pelo mantenedor. Regras: não publicar
 imagens, tags ou Releases; não usar `:latest`; não exigir credenciais pessoais;
 não mascarar falhas com `continue-on-error`. A CI foi **executada com sucesso**
-no run 45276992158 (commit `ee16d8b`), com os 4 jobs aprovados. O `actionlint`
-também passou com 0 erros.
+no run `45855227918` (commit `99565ca`), com os 5 jobs aprovados: 107 testes
+Linux/26 subtests e 38 testes de frontend. O `actionlint` também passou com 0
+erros.
 
 ### 15.4 Validador local
 
@@ -910,25 +927,27 @@ também passou com 0 erros.
 - O HACS Action valida o repositório **remoto**; sem push, ele não enxerga o
   worktree atual.
 - A `0.2.0` está apenas no branch `validation/phase-4-ci`; loja e HACS
-  personalizado apontando para `main` entregam a 0.1.x. O teste manual usa
-  add-on **local** (`/addons` em HA 2026.10.x, `/local_apps` em 2026.11+) e
-  integração copiada do commit, conforme `docs/HAOS-TEST-PLAN.md`.
+  personalizado apontando para `main` entregam a 0.1.x até o merge e a tag. A
+  instalação real da `0.2.0` foi validada, mas o canal exato usado no teste não
+  foi registrado; o roteiro de referência continua em
+  `docs/HAOS-TEST-PLAN.md`.
 - Add-on: `repository.yaml` na raiz e `alexa_ma_skill/config.yaml` com `slug`,
   `arch`, `ports`, `schema`, `watchdog`, `webui` e `backup: cold`.
 - A imagem upstream permanece
   `ghcr.io/alams154/music-assistant-skill:0.0.39-beta@sha256:b1ef...0f90f1`.
   Em 23/11/2026 o registry respondeu HTTP 200 com esse digest e um índice OCI
-  contendo `linux/amd64` e `linux/arm64`; o build do add-on não foi executado.
-- Nenhum build ou publicação de imagem foi executado.
+  contendo `linux/amd64` e `linux/arm64`. O build do add-on foi executado pelo
+  Supervisor na instalação real; não há build local/CI nem execução em `aarch64`.
+- Nenhuma imagem foi publicada.
 
 ### 15.6 Pendências da Fase 4
 
-- Instalação da `0.2.0` em HA OS `amd64` e, se possível, `aarch64`.
-- Teste ponta a ponta com Alexa e Music Assistant na `0.2.0`.
-- Comandos, backup/restauração e acesso externo completo.
+- `aarch64`, backup/restauração e atualização `0.1.1 → 0.2.0` pela loja.
+- Options flow/reauth E2E e estados de erro/reconexão do painel.
+- Exposição externa/WAF completa.
 - `brand/icon.png` e uma Release completa para o catálogo padrão do HACS.
 - Screenshots reais sem dados sensíveis.
-- Autorização explícita antes de tag, Release ou anúncio.
+- Merge do PR #1, tag e Release com autorização explícita.
 
 A Fase 4 **não é declarada concluída** enquanto os itens acima estiverem
 pendentes. A Fase 5 não foi iniciada.
