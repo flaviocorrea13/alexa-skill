@@ -392,6 +392,51 @@ class SetupFlowTest(unittest.TestCase):
         self.assertTrue(manager.confirmed("local_setup"))
         self.assertEqual(result["step_id"], "setup")
 
+    def test_unchecking_prerequisite_does_not_restore_dependent(self) -> None:
+        manager = ChecklistManager(
+            self.FakeStore(),
+            {
+                "confirmations": {
+                    "local_setup": {"at": "2026-01-01T00:00:00+00:00"},
+                    "amazon_auth": {"at": "2026-01-01T00:00:00+00:00"},
+                    "skill_created": {"at": "2026-01-01T00:00:00+00:00"},
+                }
+            },
+        )
+
+        async def refresh() -> None:
+            return None
+
+        coordinator = SimpleNamespace(
+            data=_data(),
+            async_refresh=refresh,
+            last_update_success=True,
+        )
+        flow = self._make_flow(coordinator, manager)
+
+        result = asyncio.run(
+            flow.async_step_setup(
+                {
+                    "local_setup": True,
+                    "amazon_auth": False,
+                    "skill_created": True,
+                }
+            )
+        )
+
+        self.assertEqual(result["step_id"], "setup")
+        self.assertTrue(manager.confirmed("local_setup"))
+        self.assertFalse(manager.confirmed("amazon_auth"))
+        self.assertFalse(manager.confirmed("skill_created"))
+        for step_id in (
+            "skill_enabled",
+            "provider_configured",
+            "ma_api_tested",
+            "playback_tested",
+            "commands_tested",
+        ):
+            self.assertFalse(manager.confirmed(step_id))
+
     def test_initial_open_waits_for_refresh_and_uses_updated_data(self) -> None:
         old_data = _data()
         new_data = _data(addon_version="9.9.9")
@@ -436,13 +481,13 @@ class SetupFlowTest(unittest.TestCase):
                 await asyncio.wait_for(coordinator.started.wait(), timeout=1)
                 self.assertFalse(task.done())
                 self.assertTrue(manager.confirmed("local_setup"))
-                self.assertEqual(calls, [old_data, old_data])
+                self.assertEqual(calls, [old_data, old_data, old_data])
                 coordinator.release.set()
                 return await asyncio.wait_for(task, timeout=1)
 
         result = asyncio.run(scenario())
 
-        self.assertEqual(calls, [old_data, old_data, new_data])
+        self.assertEqual(calls, [old_data, old_data, old_data, new_data])
         self.assertTrue(manager.confirmed("local_setup"))
         self.assertEqual(result["step_id"], "setup")
 

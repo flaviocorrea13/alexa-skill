@@ -1337,12 +1337,21 @@ class AlexaMaSkillOptionsFlow(OptionsFlowWithConfigEntry):
         )
 
         if user_input is not None:
-            status_by_id = {step["id"]: step["status"] for step in attrs["checklist"]}
             # Clear unchecked steps first so a dependent cannot be re-added in
             # the same submission after its prerequisite is unchecked.
             for step in attrs["manual_steps"]:
                 if not bool(user_input.get(step["id"])):
                     await runtime.checklist.async_set(step["id"], False)
+
+            # Rebuild after clearing; the previous statuses may still show a
+            # prerequisite as done and would incorrectly restore dependents.
+            _state, attrs = build_setup_checklist(
+                config,
+                runtime.coordinator.data,
+                self.hass.config.language,
+                runtime.checklist.confirmations,
+            )
+            status_by_id = {step["id"]: step["status"] for step in attrs["checklist"]}
             for step in attrs["manual_steps"]:
                 if bool(user_input.get(step["id"])) and all(
                     status_by_id.get(dependency) in ("done", "not_applicable")
