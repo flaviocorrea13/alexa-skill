@@ -439,7 +439,7 @@ worktree local e **fora do repositório público/PR**.
   suplementar.
 - Para validação operacional, a suíte foi executada no Windows com shims
   `fcntl`/`resource` e sockets habilitados, mantidos **fora do repositório**:
-  **106 passed, 1 skipped, 26 subtests** e **6 config flow OK**. Isso é evidência
+  **112 passed, 1 skipped, 47 subtests** e **6 config flow OK**. Isso é evidência
   suplementar, **não** substitui Linux/CI.
 - `scripts/validate_repo.py`: valida metadados, versões, manifestos, links,
   traduções (URLs/HTML/placeholders), steps/menu do config flow, LF e padrões de
@@ -447,10 +447,10 @@ worktree local e **fora do repositório público/PR**.
   e removeu URLs das traduções.
 - Hassfest: **10 plugins oficiais** (HA Core `2026.10.4`) passaram localmente
   com 0 erros; a execução oficial da imagem, incluindo `dependencies`, passou no
-  CI no run `45855227918` (commit `99565ca`).
+  CI no run `45983936564` (commit `0a92454`).
 - CI Linux, Hassfest e HACS Action: **executados e aprovados** no commit
-  `99565ca` (run `45855227918`, 5/5 jobs). O job de integração aprovou 107 testes
-  e 26 subtestes; o frontend aprovou 38 testes. A autenticação básica deixou de
+  `0a92454` (run `45983936564`, 5/5 jobs). O job de integração aprovou 113 testes
+  e 47 subtestes; o frontend aprovou 38 testes. A autenticação básica deixou de
   usar `aiohttp.BasicAuth` depreciado e as actions foram atualizadas para versões
   Node 24.
 - Verificação de LF.
@@ -530,7 +530,7 @@ A suíte completa do Home Assistant **não roda no Windows**: o
 
 > Exceção registrada na validação da Fase 4: uma execução suplementar no Windows
 > usou shims `fcntl`/`resource` e sockets habilitados, mantidos **fora do
-> repositório**. Ela produziu 6 config flow OK e 106 passed/1 skipped/26 subtests,
+> repositório**. Ela produziu 6 config flow OK e 112 passed/1 skipped/47 subtests,
 > mas **não é reproduzível pelo projeto nem substitui** a CI Linux. Não adicione
 > esses shims ao repositório.
 
@@ -545,8 +545,8 @@ Validação local no Windows:
   `.venv/Scripts/python.exe -m unittest tests.test_integration_helpers`
 
 O `pytest` completo da integração roda no CI Linux. O workflow está em
-`.github/workflows/ci.yml` e foi executado com sucesso no run `45855227918`
-(commit `99565ca`, 5/5 jobs): 107 testes e 26 subtestes, além de 38 testes de
+`.github/workflows/ci.yml` e foi executado com sucesso no run `45983936564`
+(commit `0a92454`, 5/5 jobs): 113 testes e 47 subtestes, além de 38 testes de
 frontend. O pacote é
 `pytest-homeassistant-custom-component==0.13.375` (Home Assistant 2026.10.4,
 Python >= 3.14). `tests/conftest.py` registra o plugin do
@@ -890,8 +890,8 @@ mantenedores; o SHA fixa o repositório da action, mas a imagem Docker referenci
 internamente continua sendo resolvida pelo mantenedor. Regras: não publicar
 imagens, tags ou Releases; não usar `:latest`; não exigir credenciais pessoais;
 não mascarar falhas com `continue-on-error`. A CI foi **executada com sucesso**
-no run `45855227918` (commit `99565ca`), com os 5 jobs aprovados: 107 testes
-Linux/26 subtests e 38 testes de frontend. O `actionlint` também passou com 0
+no run `45983936564` (commit `0a92454`), com os 5 jobs aprovados: 113 testes
+Linux/47 subtests e 38 testes de frontend. O `actionlint` também passou com 0
 erros.
 
 ### 15.4 Validador local

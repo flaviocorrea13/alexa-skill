@@ -6,19 +6,26 @@
 > e painel lateral. Backup/restauração, `aarch64`, atualização pela loja,
 > options flow/reauth e a matriz externa completa continuam pendentes.
 
-Este documento valida a versão **0.2.0 do commit
-`8ab74928d2004422a349d60cabf7672e75fccf5d`**, que está no branch
-`validation/phase-4-ci` e **ainda não foi integrada à `main`**.
+Este é o **roteiro** de validação manual da versão `0.2.0`. O commit-alvo atual é
+`0a92454e728bb6a3957abddc4406506b63440c00`, no branch `validation/phase-4-ci`,
+que **ainda não foi integrada à `main`**. O roteiro **não** afirma que esse
+commit já foi submetido à validação manual: a instalação e os seis cenários
+registrados acima foram executados na versão `0.2.0`, mas o commit exato usado
+naquele teste não foi registrado.
 
 ## 1. Versão sob teste e canais de instalação
 
-| Canal | O que instala hoje | Usar neste roteiro? |
+| Canal | O que instala hoje | Papel neste roteiro |
 |---|---|---|
-| Loja de add-ons apontando para `main` | Add-on **0.1.1** (a `main` remota ainda não tem a 0.2.0) | **Não** |
-| HACS/repositório personalizado apontando para `main` | Integração da `main`, não a do commit de validação | **Não** |
-| Add-on **local** a partir do commit `8ab7492` | Add-on **0.2.0** | **Sim** |
-| Integração copiada manualmente do mesmo commit | Integração **0.2.0** | **Sim** |
-| Release pública futura | 0.2.0 após merge/tag (não existe) | Ainda não |
+| Loja de add-ons apontando para `main` | Add-on **0.1.1** (a `main` remota ainda não tem a 0.2.0) | **Não usar** |
+| HACS/repositório personalizado apontando para `main` | Integração da `main`, não a do commit-alvo | **Não usar** |
+| Add-on **local** a partir do commit `0a92454` | Add-on **0.2.0** | **Alvo** (instalação ainda não registrada neste commit) |
+| Integração copiada manualmente do mesmo commit | Integração **0.2.0** | **Alvo** (cópia ainda não registrada neste commit) |
+| Release pública futura | 0.2.0 após merge/tag (não existe) | Ainda não existe |
+
+As linhas marcadas como **Alvo** indicam o que o roteiro manda instalar; elas
+**não** registram execução. A instalação local a partir de `0a92454` ainda não
+tem evidência registrada.
 
 **Regra:** para validar a 0.2.0, use o add-on local e a integração copiada do
 **mesmo commit**. Adicionar o repositório GitHub à loja, ou instalar pelo HACS
@@ -59,12 +66,12 @@ Assistant, versão do Supervisor, túnel/proxy, data e responsável pelo teste.
 > Assistant"**. Em uma conta com mais de uma, ele pode apagar as extras e manter
 > uma. Use uma conta de teste e confira as skills antes do setup.
 
-## 3. Obter o commit exato
+## 3. Obter o commit-alvo
 
-Baixe o arquivo do **commit**, não do branch (o branch pode avançar):
+Baixe o arquivo do **commit-alvo**, não do branch (o branch pode avançar):
 
 ```text
-https://github.com/flaviocorrea13/alexa-skill/archive/8ab74928d2004422a349d60cabf7672e75fccf5d.tar.gz
+https://github.com/flaviocorrea13/alexa-skill/archive/0a92454e728bb6a3957abddc4406506b63440c00.tar.gz
 ```
 
 Alternativa com Git em um computador de apoio:
@@ -72,14 +79,14 @@ Alternativa com Git em um computador de apoio:
 ```sh
 git clone https://github.com/flaviocorrea13/alexa-skill.git
 cd alexa-skill
-git checkout 8ab74928d2004422a349d60cabf7672e75fccf5d
+git checkout 0a92454e728bb6a3957abddc4406506b63440c00
 git rev-parse HEAD
 ```
 
 O `git rev-parse HEAD` deve retornar exatamente:
 
 ```text
-8ab74928d2004422a349d60cabf7672e75fccf5d
+0a92454e728bb6a3957abddc4406506b63440c00
 ```
 
 Extraia o arquivo e localize:
@@ -94,7 +101,7 @@ converta `run.sh` para CRLF; o add-on não inicia com CRLF.
 
 ### Hashes esperados dos arquivos de identidade
 
-Os hashes abaixo foram calculados a partir do conteúdo do commit, com LF.
+Os hashes abaixo foram calculados a partir do conteúdo do commit-alvo, com LF.
 Confirme em HAOS com `sha256sum` (ou `Get-FileHash` no Windows, após copiar):
 
 | Arquivo | SHA-256 esperado |
@@ -191,7 +198,7 @@ Get-FileHash .\custom_components\alexa_ma_skill\manifest.json -Algorithm SHA256
 
 | Verificação | Como confirmar |
 |---|---|
-| Commit baixado | `git rev-parse HEAD` = `8ab7492...` ou arquivo do commit |
+| Commit baixado | `git rev-parse HEAD` = `0a92454...` ou arquivo do commit |
 | Add-on | Página mostra `0.2.0`; hashes de `config.yaml`/`run.sh` conferem |
 | Integração | `manifest.json` mostra `0.2.0`; hash confere |
 | Slug local | `local_alexa_ma_skill` |
@@ -330,7 +337,7 @@ sensíveis).
 
 ## 15. Critérios de aprovação
 
-- Add-on local instalado com versão `0.2.0` e hashes do commit conferidos.
+- Add-on local instalado com versão `0.2.0` e hashes do commit-alvo conferidos.
 - Integração carregada do mesmo commit e descoberta do slug
   `local_alexa_ma_skill`.
 - `/setup` e `/status` acessíveis apenas na rede local.

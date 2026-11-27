@@ -12,13 +12,14 @@ adiciona configuração pela interface, um checklist de configuração de 16 eta
 e um painel administrativo somente leitura.
 
 > **Estado atual:** `0.2.0` em validação no branch `validation/phase-4-ci`
-> (PR #1, Draft). A CI passou nos cinco jobs no commit `99565ca`
-> (run `45855227918`): 107 testes Linux, 26 subtests e 38 testes de frontend.
-> A versão `0.2.0` foi instalada e testada em Home Assistant real; seis cenários
-> funcionais foram aprovados manualmente. `aarch64`, backup/restauração e
-> atualização pela loja ainda estão pendentes. Leia a
-> [matriz de validação](docs/VALIDATION-MATRIX.md) antes de instalar. Este
-> projeto **não** é afiliado à Amazon ou ao Music Assistant.
+> (PR #1). A CI do commit `0a92454` passou nos cinco jobs (run `45983936564`):
+> 113 testes Linux, 47 subtests e 38 testes de frontend. Esse resultado vale
+> para aquele commit; as alterações documentais posteriores ainda precisam de
+> uma nova execução da CI no commit final. A versão `0.2.0` foi instalada e
+> testada em Home Assistant real; seis cenários funcionais foram aprovados
+> manualmente. `aarch64`, backup/restauração e atualização pela loja ainda estão
+> pendentes. Leia a [matriz de validação](docs/VALIDATION-MATRIX.md) antes de
+> instalar. Este projeto **não** é afiliado à Amazon ou ao Music Assistant.
 
 ## O problema que este projeto resolve
 
@@ -136,7 +137,7 @@ realmente testado.
 ## Instalação
 
 > **Versão 0.2.0 em validação:** ela está no branch `validation/phase-4-ci`
-> (PR #1, Draft), commit `99565ca`, e ainda não foi integrada à `main`.
+> (PR #1), commit `0a92454`, e ainda não foi integrada à `main`.
 > Instalar pela loja/HACS agora entrega a versão da `main` (0.1.x), não a
 > 0.2.0. Para testar a 0.2.0, use o add-on local e a integração copiada do mesmo
 > commit, conforme [`docs/HAOS-TEST-PLAN.md`](docs/HAOS-TEST-PLAN.md).
@@ -388,18 +389,22 @@ Não há canal oficial de suporte por e-mail, Discord ou comunidade. O repositó
 
 | Item | Estado |
 |---|---|
-| CI (GitHub Actions) | **5 jobs aprovados** no run `45855227918`, commit `99565ca` |
-| Suíte pytest no CI Linux | **107 testes e 26 subtestes aprovados** |
+| CI (GitHub Actions) | **5 jobs aprovados** no run `45983936564`, commit `0a92454` |
+| Suíte pytest no CI Linux | **113 testes e 47 subtestes aprovados** |
 | Frontend | **38 testes aprovados**; typecheck e build aprovados |
 | Config flow (6 testes) | Aprovados no CI Linux |
 | Hassfest | **Aprovado no CI** |
 | HACS Action | **Aprovada no CI** (com ignores de metadados do GitHub) |
 | Add-on `0.2.0` em HA real | **Instalado e testado**; seis cenários funcionais manuais aprovados pelo usuário |
-| Testes locais no Windows | **106 aprovados, 1 ignorado, 26 subtestes** (suplementar; não é CI) |
+| Testes locais no Windows | **112 aprovados, 1 ignorado, 47 subtestes** (suplementar; não é CI) |
 | Add-on (unitários) | 16 testes locais aprovados (1 pulo POSIX) |
 | `aarch64` | Não executado |
 | Backup/restauração e atualização pela loja | Pendentes |
 | Catálogo padrão do HACS | Pendente de `brand/icon.png` e Release |
+
+Os resultados de CI da tabela correspondem ao run `45983936564`, executado no
+commit `0a92454`. Alterações documentais posteriores ainda precisam de uma nova
+execução da CI no commit final.
 
 Os testes manuais foram realizados pelo usuário em Home Assistant real e não
 fazem parte da CI. Os testes locais no Windows usaram shims fora do repositório e
@@ -499,7 +504,8 @@ Validation is partial but substantially complete: `0.2.0` was installed and
 tested on a real Home Assistant instance, and six manual scenarios passed
 (invocation without active music, track change, pause/resume, next track,
 multiple Echos, and the sidebar panel). CI passed all five jobs on commit
-`99565ca` (run `45855227918`): 107 Linux tests, 26 subtests, and 38 frontend
-tests. `aarch64`, backup/restore, and a store upgrade remain pending. See
+`0a92454` (run `45983936564`): 113 Linux tests, 47 subtests, and 38 frontend
+tests. Later documentation changes still require a new CI run on the final
+commit. `aarch64`, backup/restore, and a store upgrade remain pending. See
 [`docs/VALIDATION-MATRIX.md`](docs/VALIDATION-MATRIX.md) and
 [`alexa_ma_skill/DOCS.md`](alexa_ma_skill/DOCS.md).

@@ -116,9 +116,9 @@ checklist de 16 etapas e um painel administrativo somente leitura.
 
 ## Pendências de validação antes da publicação
 
-- CI, Hassfest e HACS Action: **aprovados** no run `45716728724`, commit
-  `8ab7492`, 5/5 jobs.
-- `pytest` Linux: **107 testes e 26 subtestes aprovados**; frontend com **38
+- CI, Hassfest e HACS Action: **aprovados** no run `45983936564`, commit
+  `0a92454`, 5/5 jobs.
+- `pytest` Linux: **113 testes e 47 subtestes aprovados**; frontend com **38
   testes**.
 - Instalação e fluxo principal da `0.2.0`: **aprovados pelo usuário em HA real**,
   incluindo os seis cenários funcionais.
@@ -131,8 +131,8 @@ checklist de 16 etapas e um painel administrativo somente leitura.
 
 ## Checklist pré-publicação
 
-- [ ] CI verde no commit **final** da release (o run `45716728724` aprovou
-  `8ab7492`; repetir após o diff documental).
+- [ ] CI verde no commit **final** da release (o run `45983936564` aprovou
+  `0a92454`; repetir após o diff documental).
 - [ ] Hassfest verde no commit final.
 - [ ] HACS Action verde no commit final.
 - [ ] `pytest` completo aprovado em Linux no commit final.
