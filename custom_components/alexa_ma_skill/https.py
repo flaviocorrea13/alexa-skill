@@ -12,6 +12,17 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 _HTTPS_TIMEOUT = 10
 _HTTPS_CACHE_TTL = timedelta(minutes=5)
 _STREAM_FALLBACK_STATUSES = {405, 501}
+_MAX_CACHE_ENTRIES = 128
+
+
+def _skill_status_ok(status: int) -> bool:
+    """Return True for expected responses from the public skill hostname.
+
+    A GET to ``/`` is expected to return 401/403 because the panel and WAF
+    protect that path. A 404 usually means the request hit a proxy without the
+    add-on route, so it must not be treated as reachable.
+    """
+    return status < 400 or status in {401, 403}
 
 
 class HttpsCheckCache:
@@ -63,8 +74,17 @@ class HttpsCheckCache:
             return cached[0]
 
         result = await self._async_check(url, ignore_https, stream=stream)
-        self._cache[key] = (result, now)
+        self._remember(key, result, now)
         return result
+
+    def _remember(
+        self, key: tuple[str, str, bool], result: bool, now: datetime
+    ) -> None:
+        """Store a result, keeping the cache bounded when stream URLs rotate."""
+        if key not in self._cache and len(self._cache) >= _MAX_CACHE_ENTRIES:
+            oldest_key = min(self._cache, key=lambda item: self._cache[item][1])
+            self._cache.pop(oldest_key, None)
+        self._cache[key] = (result, now)
 
     async def _async_check(
         self,
@@ -93,7 +113,7 @@ class HttpsCheckCache:
         kwargs: dict[str, Any],
     ) -> bool:
         async with self._session.get(url, **kwargs) as response:
-            return response.status < 500
+            return _skill_status_ok(response.status)
 
     async def _async_check_stream_url(
         self,

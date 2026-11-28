@@ -1,9 +1,9 @@
 name: Alexa MA Skill
-version: "0.1.1"
+version: "0.2.0"
 slug: alexa_ma_skill
 description: >-
   Executa a skill Alexa do Music Assistant com credenciais persistentes,
-  setup assistido e diagnóstico. Requer um túnel HTTPS público.
+  setup guiado e diagnóstico. Requer um túnel HTTPS público.
 url: https://github.com/flaviocorrea13/alexa-skill
 arch:
   - amd64

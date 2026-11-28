@@ -21,13 +21,20 @@
         },
         "data_description": {
           "skill_hostname": "Bare hostname only, for example skill.example.com. The tunnel must forward it to add-on port 5000.",
-          "ma_hostname": "Bare hostname only, for example ma.example.com. Required. The tunnel must forward it to the Music Assistant stream port, usually 8097.",
+          "ma_hostname": "Bare hostname only, for example ma.example.com. Optional for display-only/APL devices; required for devices without a screen. The tunnel must forward it to the Music Assistant stream port, usually 8097.",
           "locale": "Locale used when creating and enabling the Alexa skill.",
           "enable_apl": "Enable Alexa Presentation Language on display-capable devices.",
           "skip_url_validation": "Do not validate the Music Assistant stream URL before sending it to Alexa.",
-          "ma_api_url": "Base URL of the Music Assistant WebSocket API on port 8095. This is not the stream port 8097. Requires MA_API_TOKEN.",
-          "ma_api_token": "Music Assistant API token. Provide it together with MA_API_URL, or leave both empty.",
+          "ma_api_url": "Base URL of the Music Assistant WebSocket API on port 8095. This is not the stream port 8097. The token is optional when the API does not require authentication.",
+          "ma_api_token": "Music Assistant API token. Optional; use it when the API requires authentication. Requires MA_API_URL.",
           "ignore_https": "Skip certificate verification during the connectivity test. Use only for hairpin NAT or self-signed test endpoints."
+        }
+      },
+      "addon_select": {
+        "title": "Select the add-on",
+        "description": "More than one add-on matches the Alexa MA Skill base slug. Select which one the integration should manage.",
+        "data": {
+          "addon_slug": "Add-on"
         }
       },
       "manual": {
@@ -47,16 +54,16 @@
           "ignore_https": "Ignore HTTPS verification"
         },
         "data_description": {
-          "base_url": "Internal URL of the add-on container, for example http://alexa-ma-skill:5000 or http://192.168.1.10:5000.",
+          "base_url": "Internal URL of the add-on container, for example alexa-ma-skill:5000 or 192.0.2.10:5000.",
           "username": "Basic authentication username for /setup and /status.",
           "password": "Basic authentication password for /setup and /status.",
           "skill_hostname": "Bare hostname only, for example skill.example.com.",
-          "ma_hostname": "Bare hostname only, for example ma.example.com.",
+          "ma_hostname": "Bare hostname only, for example ma.example.com. Optional for display-only/APL devices; required for devices without a screen.",
           "locale": "Locale used when creating and enabling the Alexa skill.",
           "enable_apl": "Enable Alexa Presentation Language on display-capable devices.",
           "skip_url_validation": "Do not validate the Music Assistant stream URL before sending it to Alexa.",
-          "ma_api_url": "Base URL of the Music Assistant WebSocket API on port 8095. This is not the stream port 8097.",
-          "ma_api_token": "Music Assistant API token. Leave it empty if the API does not require authentication.",
+          "ma_api_url": "Base URL of the Music Assistant WebSocket API on port 8095. This is not the stream port 8097. The token is optional when the API does not require authentication.",
+          "ma_api_token": "Music Assistant API token. Optional; use it when the API requires authentication. Requires MA_API_URL.",
           "ignore_https": "Skip certificate verification if the internal URL uses HTTPS with a self-signed certificate."
         }
       },
@@ -90,14 +97,16 @@
       }
     },
     "error": {
-      "invalid_hostname": "Invalid hostname or URL. Use a bare hostname without http://, a path, or a port.",
-      "https_unreachable": "Could not reach https://{host}/. Check DNS, the tunnel, and the certificate. For hairpin NAT, enable 'Ignore HTTPS verification'. The panel credentials were already written to the add-on; fix the endpoint and run setup again.",
+      "invalid_hostname": "Invalid hostname or URL. Use a bare hostname without a scheme, a path, or a port.",
+      "https_unreachable": "Could not reach {host} over HTTPS. Check DNS, the tunnel, and the certificate. For hairpin NAT, enable 'Ignore HTTPS verification'. The panel credentials were already written to the add-on; fix the endpoint and run setup again.",
       "invalid_auth": "Invalid username or password.",
       "cannot_connect": "Could not connect to the add-on. Check that it is running and that the internal URL is correct.",
-      "addon_not_installed": "The Alexa MA Skill add-on is not installed. Install it from the add-on store.",
+      "addon_not_installed": "The Alexa MA Skill add-on is not installed. Add the repository flaviocorrea13/alexa-skill in the add-on store, install Alexa MA Skill, then try again.",
+      "invalid_addon_slug": "Select one of the discovered Alexa MA Skill add-ons.",
+      "addon_selection_required": "More than one Alexa MA Skill add-on was found. Select one in the integration options.",
       "addon_options_invalid": "The options stored in the add-on could not be validated. Check the add-on options.",
       "addon_start_timeout": "The add-on did not respond within 90 seconds. Check the add-on logs and try again.",
-      "ma_api_incomplete": "Provide both MA_API_URL and MA_API_TOKEN, or leave both empty."
+      "ma_api_incomplete": "MA_API_TOKEN requires MA_API_URL. MA_API_URL can be used without a token when Music Assistant does not require authentication."
     },
     "abort": {
       "already_configured": "Alexa MA Skill is already configured.",
@@ -108,6 +117,20 @@
   "options": {
     "step": {
       "init": {
+        "title": "Alexa MA Skill",
+        "menu_options": {
+          "settings": "Configure options",
+          "setup": "Assisted setup"
+        }
+      },
+      "restart_confirm": {
+        "title": "Restart the add-on",
+        "description": "Options saved. Changed: {changes}. Restart the add-on now? The service may be unavailable briefly.",
+        "data": {
+          "confirm": "Restart the add-on now"
+        }
+      },
+      "settings": {
         "title": "Alexa MA Skill options",
         "description": "In managed mode, changes are synchronized with the add-on and the add-on is restarted when needed. The Amazon login is always manual.",
         "data": {
@@ -119,6 +142,7 @@
           "enable_apl": "Enable APL",
           "skip_url_validation": "Skip audio URL validation",
           "skill_id": "Skill ID (advanced)",
+          "addon_slug": "Add-on",
           "ma_api_url": "Music Assistant API URL (advanced)",
           "ma_api_token": "Music Assistant API token (leave empty to keep the current one)",
           "scan_interval": "Update interval (seconds)",
@@ -127,30 +151,50 @@
         },
         "data_description": {
           "skill_hostname": "Bare hostname only, for example skill.example.com.",
-          "ma_hostname": "Bare hostname only, for example ma.example.com.",
+          "ma_hostname": "Bare hostname only, for example ma.example.com. Optional for display-only/APL devices; required for devices without a screen.",
           "username": "Basic authentication username for /setup and /status.",
           "password": "Leave empty to keep the current password.",
           "locale": "Locale used when creating and enabling the Alexa skill.",
           "enable_apl": "Enable Alexa Presentation Language on display-capable devices.",
           "skip_url_validation": "Do not validate the Music Assistant stream URL before sending it to Alexa.",
           "skill_id": "Skill ID returned by the setup flow, used to restrict requests to this skill. Leave empty to use the detected value when available.",
-          "ma_api_url": "Base URL of the Music Assistant WebSocket API on port 8095. This is not the stream port 8097.",
-          "ma_api_token": "Leave empty to keep the current token. Clear MA_API_URL to remove both.",
+          "addon_slug": "Supervisor slug of the add-on to manage. Shown when more than one match is found.",
+          "ma_api_url": "Base URL of the Music Assistant WebSocket API on port 8095. This is not the stream port 8097. The token is optional when the API does not require authentication.",
+          "ma_api_token": "Leave empty to keep the current token. Use it when the API requires authentication. Clear MA_API_URL to remove both.",
           "scan_interval": "Cheap status polling interval, from 10 to 300 seconds. The detailed ASK check remains at about 5 minutes.",
           "ignore_https": "Skip certificate verification for HTTPS checks.",
           "base_url": "Internal URL of an externally managed add-on container."
         }
+      },
+      "setup": {
+        "title": "Assisted setup",
+        "description": "Progress: {progress}. Next step: {next_step}.\n\n{summary}\n\nPending details:\n{details}\n\nLocal setup: {local_setup_url}\nProvider API URL: {provider_api_url}\n\n{duplicate_warning}\n\nCheck each manual step you completed.",
+        "data": {
+          "local_setup": "I opened the local panel and completed setup",
+          "amazon_auth": "I completed Amazon authorization",
+          "skill_created": "I read the warning, checked existing skills, and completed creation/reuse",
+          "skill_enabled": "I enabled the skill in the Alexa app",
+          "provider_configured": "I configured the Alexa provider in Music Assistant",
+          "ma_api_tested": "I tested the Music Assistant API",
+          "playback_tested": "I confirmed playback on a real Echo",
+          "commands_tested": "I tested at least one control command",
+          "back_to_menu": "Back to menu"
+        }
       }
     },
     "error": {
-      "invalid_hostname": "Invalid hostname or URL. Use a bare hostname without http://, a path, or a port.",
-      "https_unreachable": "Could not reach https://{host}/. Check DNS, the tunnel, and the certificate.",
+      "invalid_hostname": "Invalid hostname or URL. Use a bare hostname without a scheme, a path, or a port.",
+      "https_unreachable": "Could not reach {host} over HTTPS. Check DNS, the tunnel, and the certificate.",
       "invalid_auth": "Invalid username or password.",
       "cannot_connect": "Could not connect to the add-on. Check that it is running and that the internal URL is correct.",
-      "addon_not_installed": "The Alexa MA Skill add-on is not installed. Install it from the add-on store.",
+      "addon_not_installed": "The Alexa MA Skill add-on is not installed. Add the repository flaviocorrea13/alexa-skill in the add-on store, install Alexa MA Skill, then try again.",
+      "addon_selection_required": "More than one Alexa MA Skill add-on was found. Select one to manage.",
       "addon_options_invalid": "The options stored in the add-on could not be validated. Check the add-on options.",
       "addon_start_timeout": "The add-on did not respond within 90 seconds. Check the add-on logs and try again.",
-      "ma_api_incomplete": "Provide both MA_API_URL and MA_API_TOKEN, or leave both empty."
+      "ma_api_incomplete": "MA_API_TOKEN requires MA_API_URL. MA_API_URL can be used without a token when Music Assistant does not require authentication."
+    },
+    "abort": {
+      "not_loaded": "The integration is not loaded yet. Try again in a moment."
     }
   },
   "entity": {
@@ -159,10 +203,10 @@
         "name": "Container online"
       },
       "https_skill": {
-        "name": "Skill HTTPS"
+        "name": "Skill HTTPS reachable"
       },
       "https_stream": {
-        "name": "Stream HTTPS"
+        "name": "Stream HTTPS reachable"
       },
       "skill_linked": {
         "name": "Skill linked"

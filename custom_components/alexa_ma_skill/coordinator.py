@@ -27,6 +27,7 @@ from .supervisor import (
     AlexaMaSkillSupervisor,
     SupervisorOperationError,
     SupervisorUnavailableError,
+    addon_hostname,
 )
 from .util import mask_skill_id, public_stream_url
 
@@ -43,6 +44,8 @@ class AlexaMaSkillData:
     last_check: datetime | None
     detailed_error: str | None
     container_online: bool
+    addon_installed: bool | None
+    addon_hostname: str | None
     addon_version: str | None
     https_skill_ok: bool
     https_stream_ok: bool
@@ -88,6 +91,8 @@ class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
         self._last_check: datetime | None = None
         self._detailed_error: str | None = None
         self._addon_version: str | None = None
+        self._addon_installed: bool | None = None
+        self._addon_hostname: str | None = None
         self._store = store
         self._configured_skill_id = configured_skill_id.strip()
         self._detected_skill_id = initial_detected_skill_id
@@ -108,15 +113,20 @@ class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
             raise UpdateFailed(f"Unexpected response from the add-on: {err}") from err
 
         container_online = simple.reachable
-        if self._supervisor is not None and self._supervisor.available:
+        if self._supervisor is not None and self._supervisor.manager_ready:
             try:
                 (
-                    container_online,
+                    installed,
+                    running,
                     version,
-                ) = await self._supervisor.async_get_running_and_version()
+                ) = await self._supervisor.async_get_installed_running_version()
             except (SupervisorOperationError, SupervisorUnavailableError):
-                container_online = simple.reachable
+                pass
             else:
+                self._addon_installed = installed
+                container_online = running
+                slug = self._supervisor.addon_slug
+                self._addon_hostname = addon_hostname(slug) if slug else None
                 if version is not None:
                     self._addon_version = version
 
@@ -194,6 +204,8 @@ class AlexaMaSkillCoordinator(DataUpdateCoordinator[AlexaMaSkillData]):
             last_check=self._last_check,
             detailed_error=self._detailed_error,
             container_online=container_online,
+            addon_installed=self._addon_installed,
+            addon_hostname=self._addon_hostname,
             addon_version=self._addon_version,
             https_skill_ok=https_skill_ok,
             https_stream_ok=https_stream_ok,

@@ -4,10 +4,14 @@ Add-on do Home Assistant que executa o contêiner do projeto
 [music-assistant-skill](https://github.com/alams154/music-assistant-skill) e
 expõe a skill Alexa usada para controlar o Music Assistant por voz.
 
-> **Escopo desta versão (Fase 1):** somente o add-on. A integração personalizada
-> que configura o add-on pela interface do Home Assistant será adicionada na
-> Fase 2. O setup assistido com checklist e confirmação será adicionado na
-> Fase 3.
+> **Escopo desta versão:** o **add-on** é o componente necessário. A integração
+> em `custom_components/alexa_ma_skill/` é **opcional** e inclui o checklist de
+> 16 etapas e o painel administrativo **Alexa MA**. CI, Hassfest e HACS Action
+> passaram nos cinco jobs do run `45716728724` (commit `8ab7492`). A `0.2.0` foi
+> instalada e testada em HA real; ainda faltam um teste dedicado do options flow
+> e validações de `aarch64`/backup. Consulte a
+> [`docs/VALIDATION-MATRIX.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/VALIDATION-MATRIX.md)
+> para o estado real das validações.
 
 ## Como funciona
 
@@ -45,10 +49,368 @@ https://MA_HOSTNAME  --->  túnel/reverse proxy  --->  Music Assistant :8097
 - O add-on **não cria túneis, não gerencia certificados e não abre portas no
   roteador**. Você é responsável pela exposição HTTPS pública.
 
+## Slug e hostname interno do add-on
+
+Add-ons instalados de um repositório personalizado recebem um prefixo
+`<hash>_` do Supervisor. Por isso, o slug real pode ser
+`0a1b2c3d_alexa_ma_skill` em vez de `alexa_ma_skill`.
+
+O hostname interno do add-on é derivado do slug trocando `_` por `-`. A
+integração opcional usa este slug e hostname; ela está implementada e validada
+no CI Linux/Hassfest e em HA real no fluxo principal e no painel. Options
+flow/reauth completos, `aarch64` e backup/restauração ainda estão pendentes.
+
+Exemplos:
+
+| Slug no Supervisor | Hostname interno |
+|---|---|
+| `alexa_ma_skill` | `alexa-ma-skill` |
+| `0a1b2c3d_alexa_ma_skill` | `0a1b2c3d-alexa-ma-skill` |
+
+Use o hostname derivado ao acessar o add-on a partir de outro contêiner ou em
+configurações manuais. A porta interna continua sendo `5000`.
+
+## Integração personalizada (opcional)
+
+A integração `custom_components/alexa_ma_skill` é uma camada opcional de
+configuração e diagnóstico. O add-on funciona sem ela.
+
+### Instalação
+
+**Manual (sem HACS):**
+
+1. Copie `custom_components/alexa_ma_skill` para
+   `/config/custom_components/alexa_ma_skill` (Samba, Studio Code Server ou
+   Terminal & SSH).
+2. Reinicie o Home Assistant.
+3. Abra **Configurações > Dispositivos e serviços > Adicionar integração**.
+4. Escolha **Alexa MA Skill**.
+5. Se houver mais de um add-on correspondente, selecione o slug correto.
+
+**HACS (repositório personalizado):**
+
+1. Abra o HACS e escolha **Integrações**.
+2. No menu de três pontos, escolha **Repositórios personalizados**.
+3. Adicione `https://github.com/flaviocorrea13/alexa-skill` como integração.
+4. Instale **Alexa MA Skill** e reinicie o Home Assistant.
+
+O HACS não é necessário. A HACS Action passou no CI para a instalação como
+repositório personalizado; a inclusão no catálogo padrão **não foi validada** e
+ainda exige `custom_components/alexa_ma_skill/brand/icon.png` e uma Release
+publicada. A partir do Home Assistant 2026.11, o HACS é distribuído como
+**Marketplace**; os nomes de menu podem variar.
+
+### Descoberta do add-on
+
+A integração usa os helpers do componente `hassio` para listar os add-ons e
+procura:
+
+- slug exatamente igual a `alexa_ma_skill`;
+- slug terminado em `_alexa_ma_skill`.
+
+Se houver mais de um, ela mostra um seletor. O slug escolhido é persistido na
+config entry e usado em todas as operações do `AddonManager`.
+
+Se o Supervisor não estiver disponível, a integração oferece o modo manual com
+a URL interna de um contêiner externo.
+
+### Opções gerenciadas
+
+A integração gerencia:
+
+- `SKILL_HOSTNAME`;
+- `MA_HOSTNAME` (opcional);
+- `LOCALE`;
+- `ENABLE_APL`;
+- `SKIP_URL_VALIDATION`;
+- `SKILL_ID`;
+- `MA_API_URL`;
+- `MA_API_TOKEN`;
+- `APP_USERNAME`/`APP_PASSWORD` no modo gerenciado.
+
+`TZ` não é gerenciado pela integração; o valor existente é preservado. Opções
+desconhecidas também são preservadas porque o `AddonManager` mescla as opções
+atuais com as alterações.
+
+O options flow também permite ajustar o intervalo de atualização (10–300
+segundos) e `IGNORE_HTTPS`, que desativa a verificação de certificado apenas nas
+checagens de conectividade. Use `IGNORE_HTTPS` somente em cenários controlados
+de hairpin NAT ou certificados de teste.
+
+### Segredos
+
+- Campos de senha e token vazios preservam o valor atual quando possível.
+- A integração não tenta ler o conteúdo de arquivos de segredo do add-on.
+- Se as credenciais do add-on estiverem em arquivos (geradas automaticamente)
+  ou ausentes, o fluxo inicial pode gerar novas credenciais. Nesse caso,
+  atualize o provider Alexa do Music Assistant.
+- Segredos não são expostos em logs, entidades ou diagnostics.
+- Alterações que exigem reinício mostram uma confirmação. Se o reinício for
+  recusado ou falhar, as opções permanecem salvas e o add-on pode ser
+  reiniciado manualmente.
+
+### Painel administrativo (Alexa MA)
+
+A integração registra o painel **Alexa MA** no menu lateral do Home Assistant,
+também acessível pelo caminho `/alexa-ma`.
+
+- O painel é visível apenas para administradores.
+- A visão geral é **somente leitura**: não inicia/para o add-on, não altera
+  opções e não controla a reprodução.
+- Quando há mais de uma config entry carregada, o painel mostra um seletor; com
+  uma entry, ela é selecionada automaticamente.
+- O botão **Atualizar** executa um refresh manual com cooldown de 5 segundos.
+  Cliques repetidos dentro do cooldown retornam o snapshot atual sem iniciar
+  outra atualização.
+- Erros são exibidos como estado do painel. Se a config entry selecionada for
+  removida, o painel recarrega a lista e seleciona a entry padrão/restante; se a
+  recarga falhar, mostra **Tentar novamente**.
+- O painel depende do add-on acessível para obter os dados. Com o add-on parado,
+  o setup da integração pode não concluir e o painel pode não aparecer; verifique
+  o add-on no Supervisor.
+
+O painel não expõe senhas, tokens, credenciais ASK, URLs de stream ou Skill IDs
+completos. Os dados vêm do coordinator e dos endpoints locais do add-on.
+
+### Diagnóstico e entidades
+
+A integração consulta `/status` e `/setup` e expõe:
+
+- estado do serviço e do contêiner;
+- HTTPS alcançável da skill e do stream;
+- status da skill, da API do MA e da API da Alexa;
+- checklist de setup;
+- `SKILL_ID` configurado/detectado/sugerido;
+- diagnostics com IDs e tokens mascarados.
+
+As entidades distinguem **alcançável** de **validado**. Um hostname preenchido
+ou um add-on em execução não provam, sozinhos, que o endpoint público ou a
+autenticação funcionam.
+
+### Recuperação e remoção
+
+- Use **Configurar** nas opções da integração para alterar hostnames, locale,
+  credenciais e opções do add-on.
+- Se o add-on for reinstalado com outro slug, a integração tenta descobrir a
+  nova instalação; com múltiplos candidatos, use o seletor.
+- Remover a integração **não** para o add-on, não desinstala o add-on, não apaga
+  suas opções, credenciais ASK ou dados em `/data`.
+
+## Setup assistido (Fase 3)
+
+Abra **Configurações > Dispositivos e serviços > Alexa MA Skill > Configurar >
+Setup assistido**.
+
+### Pré-requisitos
+
+- Add-on instalado pelo repositório de add-ons (não é necessário HACS).
+- Integração `alexa_ma_skill` instalada e carregada.
+- Home Assistant OS ou Supervised, para que o Supervisor informe o estado do
+  add-on.
+- Acesso local ao Home Assistant para abrir `http://<IP_DO_HA>:5000/setup`.
+
+Se o Supervisor não estiver disponível, a integração funciona em modo manual,
+mas as etapas que dependem do add-on aparecem como não verificadas.
+
+O checklist tem 16 etapas. Cada uma mostra:
+
+- o que está sendo verificado;
+- por que é necessário;
+- o resultado atual;
+- como corrigir uma falha;
+- se é automática ou manual;
+- a próxima ação recomendada.
+
+### Estados
+
+- **Não iniciado**: ainda não verificado.
+- **Pendente**: aguarda uma ação ou condição.
+- **Em verificação**: consulta em andamento.
+- **Concluído**: condição confirmada.
+- **Atenção**: condição parcial ou não verificada; não é necessariamente erro fatal.
+- **Bloqueado**: depende de uma etapa anterior.
+- **Não aplicável**: recurso opcional não configurado.
+
+O progresso é calculado por etapas concluídas divididas pelas etapas aplicáveis.
+Etapas `NÃO APLICÁVEL` não entram no denominador. Etapas bloqueadas ou com
+atenção **não** contam como concluídas.
+
+### As 16 etapas
+
+1. **Add-on instalado** — automática; usa o Supervisor.
+2. **Add-on iniciado** — automática; verifica o serviço interno, não apenas o contêiner.
+3. **Credenciais do painel** — automática; confirma que a autenticação em `/status` funciona.
+4. **Hostname público da skill** — automática; valida o formato, não o DNS.
+5. **Hostname do stream** — automática; se vazio, fica em atenção com limitações de áudio.
+6. **Acesso local ao setup** — manual; use `http://<IP_DO_HOME_ASSISTANT>:5000/setup`.
+7. **Autorização Amazon** — manual; o Home Assistant não automatiza o login.
+8. **Skill criada ou reutilizada** — manual e sensível; exige confirmação sobre skills duplicadas.
+9. **Skill ID obtido** — automática quando o add-on expõe o ID; caso contrário, manual.
+10. **Skill ID configurado** — automática; distingue configurado, válido e correspondente.
+11. **Skill habilitada na Alexa** — manual; confirme no aplicativo Alexa.
+12. **Provider Alexa no Music Assistant** — manual; use a URL interna, Basic Auth e domínio Amazon.
+13. **API do Music Assistant testada** — manual; valida o formato da URL e exige confirmação do teste real. Não aplicável sem `MA_API_URL`.
+14. **Stream público validado** — automática; confirma HTTPS e resposta, não o conteúdo.
+15. **Reprodução testada** — manual; teste em um Echo real.
+16. **Comandos testados** — manual; teste próximo/anterior. Não aplicável sem `MA_API_URL`.
+
+### Etapa sensível: skills duplicadas
+
+> **Atenção:** o script upstream procura skills chamadas exatamente
+> **"Music Assistant"**. Se encontrar mais de uma, poderá **excluir as
+> ocorrências extras** e manter uma. Antes de confirmar a etapa 8, confira as
+> skills existentes na conta Amazon usada no setup.
+
+A confirmação da etapa 8 só deve ser marcada depois de ler o aviso, conferir a
+conta e aceitar o comportamento. A integração **não executa** o script de
+criação de skill; ela apenas registra a confirmação manual.
+
+### Provider Alexa no Music Assistant
+
+Na etapa 12, configure no Music Assistant:
+
+| Campo | Valor |
+|---|---|
+| API URL | `http://<slug-do-add-on-com-hifens>:5000`, sem `/ma` |
+| API Basic Auth Username | `APP_USERNAME` do painel |
+| API Basic Auth Password | `APP_PASSWORD` do painel |
+| URL | domínio Amazon da conta (`amazon.com`, `amazon.com.br` etc.) |
+| OTP Secret | vazio quando não houver TOTP válido |
+
+A URL interna aparece no checklist. Não use `https://<SKILL_HOSTNAME>` como API
+URL do provider; `/ma` é bloqueado publicamente.
+
+### O que é verificado automaticamente
+
+- **Add-on instalado**: consulta o Supervisor e o slug escolhido.
+- **Add-on iniciado**: confirma que o serviço interno responde; contêiner em
+  execução sem resposta vira **atenção**.
+- **Credenciais do painel**: confirma que o `/status` aceita a autenticação.
+- **Hostnames**: valida apenas o formato; não prova DNS, TLS ou roteamento.
+- **Skill ID**: compara o valor configurado com o último ID detectado pelo
+  add-on e mostra o formato inválido.
+- **Stream público**: confirma que a URL do stream recebida do Music Assistant
+  responde por HTTPS; não valida o áudio.
+
+### Teste da API do Music Assistant
+
+A integração **não** abre uma conexão WebSocket própria com o Music Assistant.
+Não existe contrato confiável no add-on para testar a API na porta `8095`, e
+fazer uma conexão de teste poderia alterar estado do player. Por isso:
+
+- o formato de `MA_API_URL` é validado automaticamente;
+- com `MA_API_URL` vazia, a etapa fica **não aplicável**;
+- com URL válida, a etapa é manual e exige confirmação do teste real.
+
+Teste sugerido, fora do Home Assistant, no host do Music Assistant:
+
+```sh
+curl -i "http://<IP_DO_MA>:8095/"
+```
+
+Um `426 Upgrade Required`, `400` ou `401` indica que a porta responde. Um erro
+de conexão indica host, porta ou rede errados. A porta `8095` é a API; a `8097`
+é o stream de áudio. Não confunda as duas.
+
+### Teste do stream público
+
+O checklist confirma que a URL de stream recebida do Music Assistant responde
+por HTTPS. Para validar de verdade DNS, certificado e proxy, execute de uma rede
+externa:
+
+```sh
+curl -I "https://<MA_HOSTNAME>/"
+```
+
+- `200`/`206` indica que a rota responde;
+- erro de certificado indica cadeia TLS inválida;
+- `404 page not found` vindo do proxy indica rota ausente ou ordem errada das
+  rotas no túnel;
+- não é possível simular rede externa a partir da rede local.
+
+### Teste de reprodução
+
+1. Inicie uma reprodução no Music Assistant.
+2. Garanta que o provider Alexa está configurado (etapa 12).
+3. Peça a reprodução no Echo: **"Alexa, abra music assistant"**.
+4. Confirme que o áudio tocou em um Echo real.
+
+A integração **não** inicia reprodução nem muda o estado dos players. A
+conclusão depende de confirmação manual. Se o add-on foi reiniciado, toque algo
+pelo Music Assistant antes de invocar a Alexa, porque o último stream fica em
+memória.
+
+### Teste de comandos
+
+Com a reprodução ativa, teste próximo, anterior e pausa pela Alexa. A conclusão
+depende de teste funcional real; a API responder não prova que os comandos
+chegam ao player. Sem `MA_API_URL`, a etapa fica **não aplicável**.
+
+### Recuperação após falhas
+
+- **Add-on não instalado**: adicione o repositório e instale o add-on; a
+  integração não instala nada.
+- **Add-on parado**: inicie pelo painel do Supervisor.
+- **Autenticação recusada**: ajuste `APP_USERNAME`/`APP_PASSWORD` nas opções e
+  reinicie; a integração não lê segredos que só existem em arquivo.
+- **Skill ID divergente**: copie o valor `Done. Skill ID:` do painel local e
+  configure em **Configurar opções**.
+- **Stream indisponível**: confira o provider, a rota do túnel e a ordem das
+  rotas.
+- Se a comunicação com o add-on falhar, a integração continua carregada e o
+  checklist é montado com os dados disponíveis; use **Recarregar** na
+  integração depois de corrigir o problema.
+
+### Persistência e invalidação
+
+As confirmações manuais ficam em um `Store` da integração, sem senhas, tokens ou
+cookies. O progresso sobrevive a reinícios do Home Assistant, reinícios do
+add-on e fechamento da interface.
+
+Alterações de configuração invalidam apenas as etapas manuais dependentes:
+
+- `SKILL_HOSTNAME` não apaga a confirmação de autorização Amazon nem a do
+  provider; invalida criação da skill, reprodução e comandos;
+- `MA_HOSTNAME` invalida provider/stream/reprodução;
+- `MA_API_URL`/token invalidam o teste de API e os comandos;
+- credenciais do painel invalidam acesso local, provider, teste de API e
+  comandos;
+- mudança de slug invalida as etapas manuais dependentes do add-on.
+
+### Revalidação e retomada
+
+- Abra novamente o setup para recalcular as etapas automáticas.
+- Marque ou desmarque as confirmações manuais e envie o formulário.
+- Use a opção de voltar ao menu para alterar configurações.
+- O sensor `sensor.setup_checklist` expõe `progress`, `checklist`, `manual_steps`
+  e a próxima etapa nos atributos.
+
+### Limitações desta fase
+
+- O login e a autorização Amazon continuam manuais; nenhuma senha Amazon é
+  solicitada ou armazenada.
+- A criação/reutilização da skill é executada pelo painel do add-on, não pela
+  integração.
+- O teste de stream confirma HTTPS/resposta, não o conteúdo do áudio.
+- Testes de reprodução e comandos dependem de confirmação manual real.
+- Os testes de config flow e da suíte completa passaram no CI Linux (107 testes
+  e 26 subtestes, commit `8ab7492`), assim como os 38 testes de frontend. A
+  execução no Windows com shims foi apenas suplementar. Hassfest e HACS Action
+  também passaram. A `0.2.0` foi validada em HA real no fluxo principal e no
+  painel; ainda faltam teste E2E dedicado do options flow/reauth, `aarch64` e
+  backup/restauração.
+- A integração não gerencia `TZ` nem tenta recuperar segredos que o Supervisor
+  mantém apenas em arquivos.
+- A versão mínima declarada em `hacs.json` é Home Assistant `2026.10.4`
+  (ambiente de desenvolvimento); versões anteriores não foram validadas.
+- Não há screenshots reais na documentação; a lista de capturas necessárias está
+  em [`docs/images/README.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/images/README.md).
+
 ## Requisitos
 
 - Home Assistant OS ou Home Assistant Supervised, com add-ons habilitados.
-- Arquitetura `amd64` ou `aarch64`.
+- Arquitetura `amd64` ou `aarch64`. A imagem upstream publica as duas
+  arquiteturas, mas a execução real do add-on foi observada apenas em `amd64`.
 - Music Assistant instalado e acessível na sua rede.
 - Uma conta de desenvolvedor da Amazon:
   <https://developer.amazon.com/alexa/console/ask>.
@@ -65,6 +427,21 @@ https://MA_HOSTNAME  --->  túnel/reverse proxy  --->  Music Assistant :8097
   certificado autoassinado.
 - A imagem original não suporta TLS 1.3. Se usar Cloudflare, configure a
   versão mínima de TLS como **1.2**.
+
+### Quadro de rede
+
+| Configuração | Finalidade |
+|---|---|
+| `SKILL_HOSTNAME` | Hostname público HTTPS chamado pela Alexa; encaminha para a porta `5000` do add-on. |
+| `MA_HOSTNAME` | Hostname público HTTPS do áudio; encaminha para a porta `8097` do Music Assistant. |
+| `MA_API_URL` | API WebSocket do Music Assistant, porta `8095`; usada para comandos de controle. |
+| `MA_API_TOKEN` | Token da API do Music Assistant, quando exigido. |
+| Porta `5000` | Serviço do add-on: `/setup`, `/status`, `/ma` na rede local. |
+| Porta `8095` | API WebSocket do Music Assistant. |
+| Porta `8097` | Stream de áudio do Music Assistant. |
+
+Não confunda as portas: `5000` é o add-on, `8095` é a API do MA e `8097` é o
+stream.
 
 > **Nabu Casa não é usado.** O projeto não cria nem gerencia túneis.
 
@@ -105,17 +482,17 @@ do host escolhida nos URLs locais e no túnel.
 | `AWS_DEFAULT_REGION` | Não | `us-east-1` | Região usada pelo ASK CLI. |
 | `ENABLE_APL` | Não | `false` | Habilita APL em dispositivos com tela. |
 | `SKIP_URL_VALIDATION` | Não | `false` | Não valida a URL do stream antes de enviá-la à Alexa. |
-| `SKILL_ID` | Não | — | ID `amzn1.ask.skill...` para restringir a skill às próprias requisições. A integração detecta e sugere o valor. |
-| `MA_API_URL` | Não** | — | URL base da API WebSocket do Music Assistant, porta `8095`. |
-| `MA_API_TOKEN` | Não** | — | Token da API do Music Assistant. |
+| `SKILL_ID` | Não | — | ID `amzn1.ask.skill...` para restringir a skill às próprias requisições. O ID aparece nos logs do `/setup`; a integração opcional também pode sugerir o valor. |
+| `MA_API_URL` | Não** | — | URL base da API WebSocket do Music Assistant, porta `8095`. O token é opcional quando a API não exige autenticação. |
+| `MA_API_TOKEN` | Não** | — | Token da API do Music Assistant. Opcional; use quando a API exigir autenticação. Exige `MA_API_URL`. |
 
 \* `MA_HOSTNAME` é obrigatório na prática para Echo Dot e outros dispositivos
 sem tela, e também para exibir capa em dispositivos com tela.
 
-\** `MA_API_URL` e `MA_API_TOKEN` são necessários para comandos de voz que
-controlam o player do Music Assistant (próxima, anterior, início da faixa e
-sincronização de pausar/parar/continuar). A reprodução de áudio funciona sem
-eles.
+\** `MA_API_URL` é necessária para comandos de voz que controlam o player do
+Music Assistant (próxima, anterior, início da faixa e sincronização de
+pausar/parar/continuar). `MA_API_TOKEN` é necessário apenas quando a API do MA
+exige autenticação. A reprodução de áudio funciona sem eles.
 
 ### `SKILL_HOSTNAME` e `MA_HOSTNAME`
 
@@ -142,33 +519,64 @@ aleatórios no primeiro início e grava:
 
 As senhas **nunca** aparecem no log do add-on.
 
-Para ler os valores gerados, use o add-on **Terminal & SSH** com acesso ao
-host:
+### Como obter ou definir as credenciais
+
+Há dois caminhos suportados:
+
+1. **Definir antes do primeiro início, pelas opções do add-on.** Preencha
+   `APP_USERNAME` e `APP_PASSWORD` na aba **Configuração**. Não é necessário
+   acessar arquivos, Docker ou terminal.
+2. **Ler as credenciais geradas.** O add-on grava arquivos em `/data`, mas o
+   acesso depende do ambiente:
+   - **Terminal & SSH** com acesso ao Docker do host: use
+     `docker exec addon_<slug> ...`;
+   - **acesso ao sistema de arquivos do HA OS**: use o caminho
+     `/mnt/data/supervisor/addons/data/<slug>/...`;
+   - **sem acesso ao Docker/host**: defina credenciais explícitas pelas opções
+     do add-on e reinicie. Não presuma que o painel do add-on exibe a senha.
+
+Para ler os valores gerados com acesso ao Docker do host:
 
 ```sh
-docker exec addon_alexa_ma_skill cat /data/generated_app_username
-docker exec addon_alexa_ma_skill cat /data/generated_app_password
+# Substitua <slug> pelo slug real do Supervisor, por exemplo
+# 0a1b2c3d_alexa_ma_skill.
+docker exec addon_<slug> cat /data/generated_app_username
+docker exec addon_<slug> cat /data/generated_app_password
 ```
 
-Ou, no Home Assistant OS:
+Ou, com acesso ao sistema de arquivos do HA OS:
 
 ```sh
-sudo cat /mnt/data/supervisor/addons/data/alexa_ma_skill/generated_app_username
-sudo cat /mnt/data/supervisor/addons/data/alexa_ma_skill/generated_app_password
+sudo cat /mnt/data/supervisor/addons/data/<slug>/generated_app_username
+sudo cat /mnt/data/supervisor/addons/data/<slug>/generated_app_password
 ```
 
-Se preferir não usar SSH, defina `APP_USERNAME` e `APP_PASSWORD` você mesmo
-nas opções do add-on antes do primeiro início. Não use credenciais padrão como
-`admin`/`teste`.
+> O comando `docker` pode não estar disponível no add-on **Terminal & SSH**
+> quando a proteção está habilitada. Nesse caso, use as opções do add-on ou o
+> acesso ao host; não há promessa de leitura de segredos pela integração.
+>
+> Os nomes de contêiner e caminhos podem variar conforme a versão do Home
+> Assistant OS (add-ons/apps). Confirme com `docker ps`/`ha` ou use as opções do
+> add-on.
+
+As mesmas credenciais protegem `/ma` e devem ser usadas no provider Alexa do
+Music Assistant:
+
+- `API Basic Auth Username` = `APP_USERNAME`
+- `API Basic Auth Password` = `APP_PASSWORD`
+
+Ao trocar a senha, atualize também o provider no MA.
 
 Para trocar as credenciais depois:
 
 1. Preencha `APP_USERNAME` e `APP_PASSWORD` com os novos valores.
 2. Reinicie o add-on.
 
-Se você deixar os campos em branco novamente, o add-on reutiliza os arquivos
-gerados existentes. Para gerar novos valores, apague os arquivos em `/data`
-(ou defina credenciais explícitas) e reinicie.
+Se os campos estiverem em branco e já existir um arquivo gerado, o add-on
+reutiliza o valor existente. Se você definir credenciais explícitas, os arquivos
+gerados antigos são removidos; ao voltar a deixar os campos em branco, novas
+credenciais são geradas. Para forçar uma nova geração, apague os arquivos em
+`/data` (ou defina credenciais explícitas) e reinicie.
 
 ### Credenciais do ASK CLI
 
@@ -202,12 +610,16 @@ Ação: **Block**.
 
 Isso bloqueia publicamente:
 
-- `/setup`
-- `/status`
+- `/setup` e `/setup/*`
+- `/status` e `/status/*`
 - `/devices`
 - `/docs`
+- `/openapi.json`
 - `/ma`
 - `/alexa`
+- `/simulator`
+- `/simulator/*`
+- `/invocations`
 - qualquer outro caminho
 
 Mantenha esses caminhos acessíveis apenas pela rede local, por exemplo em
@@ -265,6 +677,17 @@ O mesmo princípio se aplica:
 
 ## Primeiro setup da skill
 
+> **Atenção — skills duplicadas:** o script upstream procura skills chamadas
+> exatamente **"Music Assistant"**. Se encontrar mais de uma, ele poderá
+> **excluir as ocorrências extras** e manter uma. Antes de continuar, confira as
+> skills existentes na conta Amazon usada no setup. O add-on **não** exibe uma
+> confirmação interativa própria; essa ação é comportamento do script upstream.
+
+> **Acesso ao painel:** use sempre
+> `http://<IP_DO_HOME_ASSISTANT>:5000/setup` na rede local. Não abra
+> `https://<SKILL_HOSTNAME>/setup`: o caminho `/setup` é bloqueado pela regra de
+> segurança do hostname público.
+
 1. Confirme que `SKILL_HOSTNAME` e `MA_HOSTNAME` estão corretos e que os
    túneis estão ativos.
 2. Abra `http://<IP_DO_HOME_ASSISTANT>:5000/setup` na rede local.
@@ -283,9 +706,8 @@ O mesmo princípio se aplica:
    - aguarda a compilação dos modelos;
    - tenta habilitar a skill para testes.
 9. Quando aparecer `Done. Skill ID: amzn1.ask.skill...`, copie o ID.
-   - A integração personalizada (Fase 2) lê esse ID automaticamente do
-     `/setup`, avisa quando `SKILL_ID` está vazio ou divergente e sugere o
-     valor correto.
+   - Se você usa a integração opcional da Fase 2, ela também pode ler esse ID
+     do `/setup` e sugerir o valor. Isso não é necessário para o add-on.
 10. Volte às opções do add-on, preencha `SKILL_ID` com esse valor e reinicie o
     add-on. Isso restringe a skill às requisições destinadas a ela.
 11. No aplicativo Alexa, abra **Mais > Skills > Suas Skills > Dev** (ou
@@ -331,16 +753,18 @@ de voz que controlam o player do Music Assistant (próxima, anterior, início da
 faixa e sincronização de pausar/parar/continuar), configure:
 
 - `MA_API_URL`: URL base da API WebSocket do Music Assistant, porta `8095`.
-  Exemplo: `http://192.168.1.10:8095`.
+  Exemplo: `http://192.0.2.10:8095`.
 - `MA_API_TOKEN`: token da API, se o Music Assistant exigir autenticação.
 
 Não inclua usuário ou senha na `MA_API_URL`; use `MA_API_TOKEN` para a
-autenticação.
+autenticação. O add-on aceita `http://`, `https://`, `ws://` ou `wss://` e
+rejeita credenciais embutidas na URL.
 
 `MA_API_URL` **não** é a porta de stream `8097`. São serviços diferentes:
 
 | Serviço | Porta padrão | Uso |
 |---|---:|---|
+| Add-on / provider Alexa do MA | `5000` | `/ma/push-url`, `/setup`, `/status` |
 | Stream do Music Assistant | `8097` | Áudio enviado à Alexa (`MA_HOSTNAME`) |
 | API WebSocket do Music Assistant | `8095` | Comandos de controle (`MA_API_URL`) |
 
@@ -355,6 +779,116 @@ Para associar cada Echo ao player correto do Music Assistant, abra
 Próxima/anterior e início da faixa dependem do Music Assistant para escolher o
 conteúdo. Pausar, parar e continuar controlam o player Alexa diretamente e
 também são sincronizados com o Music Assistant quando há um player associado.
+
+## Provider Alexa do Music Assistant
+
+A Alexa não busca o stream diretamente no Music Assistant. O provider **Alexa**
+do MA envia a URL do stream para o add-on via `POST /ma/push-url`. Depois a
+skill lê essa URL e responde com `AudioPlayer.Play`.
+
+No Music Assistant, em **Settings > Providers > Alexa**, configure:
+
+| Campo | Valor |
+|---|---|
+| `URL` | Domínio Amazon da conta: `amazon.com`, `amazon.com.br` etc. |
+| `E-mail` | Conta Amazon usada pelos Echos. |
+| `Senha` | Senha da conta Amazon. |
+| `OTP Secret` | Vazio se não houver uma chave TOTP válida. |
+| `API URL` | `http://<IP_DO_HOME_ASSISTANT>:5000` |
+| `API Basic Auth Username` | `APP_USERNAME` do add-on. |
+| `API Basic Auth Password` | `APP_PASSWORD` do add-on. |
+
+Regras importantes:
+
+- Use a URL **interna** do add-on, por exemplo
+  `http://192.0.2.10:5000`.
+- Não use `https://SKILL_HOSTNAME` como `API URL`. O caminho `/ma` é bloqueado
+  publicamente pelo WAF e não deve ser exposto.
+- Não use `http://localhost:5000` se o Music Assistant estiver em outro
+  contêiner/add-on; nesse caso, `localhost` aponta para o próprio contêiner do
+  MA.
+- O `API URL` é a base, **sem** `/ma`. O provider acrescenta `/ma/push-url`.
+- Se você trocar `APP_USERNAME`/`APP_PASSWORD` no add-on, atualize também o
+  provider Alexa do MA.
+- O `OTP Secret` só deve ser preenchido quando existe uma chave TOTP válida.
+
+### Teste do stream no add-on
+
+Use as credenciais do painel:
+
+```sh
+APP_USERNAME='<APP_USERNAME>'
+APP_PASSWORD='<APP_PASSWORD>'
+
+curl -i -u "$APP_USERNAME:$APP_PASSWORD" \
+  "http://<IP_DO_HOME_ASSISTANT>:5000/ma/latest-url"
+```
+
+Interpretação:
+
+| Resposta | Significado |
+|---|---|
+| `200` com `streamUrl` | O MA enviou o stream e o add-on tem uma URL. |
+| `404 {"error":"No URL available"}` | Autenticação OK, mas o MA ainda não enviou stream. |
+| `401 Unauthorized` | `APP_USERNAME`/`APP_PASSWORD` errados no provider ou no `curl`. |
+| Erro de conexão | `API URL` inacessível a partir do MA; confira IP, porta `5000` e rede. |
+
+Para testar o push manualmente:
+
+```sh
+curl -i -u "$APP_USERNAME:$APP_PASSWORD" \
+  -H 'Content-Type: application/json' \
+  -d '{"streamUrl":"https://example.com/test.mp3","title":"teste"}' \
+  "http://<IP_DO_HOME_ASSISTANT>:5000/ma/push-url"
+```
+
+Esperado: `200` com `{"status":"ok"}`. Isso grava uma URL falsa apenas para
+teste; o próximo play real do MA sobrescreve o valor.
+
+### Depois de reiniciar o add-on
+
+O add-on guarda o último stream em memória. Quando ele reinicia, esse valor é
+perdido. A ordem correta é:
+
+1. Reiniciar o add-on.
+2. No Music Assistant, tocar algo no player do Echo.
+3. O MA envia um novo `POST /ma/push-url`.
+4. Conferir o `200` em `/ma/latest-url`.
+5. Invocar a Alexa.
+
+Se você invocar a Alexa antes do passo 2, a skill pode responder que não
+conseguiu obter o stream.
+
+### `Play action failed` no Music Assistant
+
+Esse aviso é do provider Alexa do MA, não do add-on. Ele indica que o provider
+não conseguiu enviar o stream ou o comando para o Echo.
+
+Verifique:
+
+- `API URL` interno, com a porta `5000` correta;
+- `API Basic Auth Username`/`Password` iguais aos do add-on;
+- provider autenticado na conta Amazon;
+- Echo online e na mesma conta;
+- skill habilitada em **Skills > Suas Skills > Dev**;
+- logs do MA em busca de `/ma/push-url`, `401`, `Failed API request` ou
+  `ActionUnavailable`.
+
+### Domínio da conta Amazon
+
+O aviso:
+
+```text
+amazon.com.br does not match account domain amazon.com
+```
+
+pode ser ignorado se o áudio tocar. Se o login, o `Play action failed` ou o
+comando para o Echo continuarem falhando, tente o domínio correto da conta:
+
+- conta brasileira: `amazon.com.br`;
+- conta americana: `amazon.com`.
+
+Depois de alterar o domínio, reautentique o provider e conclua o 2FA.
 
 ## Diagnóstico
 
@@ -386,6 +920,19 @@ Não faça chamadas públicas a `/status`.
 - Confirme que `PORT` é `5000`.
 - Confirme que `LOCALE` é um dos valores aceitos.
 
+### A integração opcional diz que o add-on não está instalado
+
+> Esta seção só se aplica se você instalou a integração da Fase 2. O add-on
+> funciona sem ela.
+
+- Add-ons de repositório personalizado têm slug com prefixo `<hash>_`, por
+  exemplo `0a1b2c3d_alexa_ma_skill`.
+- A integração procura `alexa_ma_skill` ou `*_alexa_ma_skill` e guarda o slug
+  encontrado. Se houver mais de um, ela mostra um seletor.
+- Verifique no Supervisor qual é o slug real e reinicie a integração.
+- O hostname interno é o slug com `_` trocado por `-`, por exemplo
+  `0a1b2c3d-alexa-ma-skill`.
+
 ### Recebo 401 em `/setup` ou `/status`
 
 - Use as credenciais do painel.
@@ -415,8 +962,8 @@ Não faça chamadas públicas a `/status`.
 - O `SKILL_ID` configurado não corresponde ao ID da skill criada.
 - O ID correto aparece nos logs de `/setup` como `Done. Skill ID:` e também
   pode aparecer no `/status`.
-- A integração personalizada detecta o ID e sugere o valor correto no checklist
-  e no `binary_sensor.skill_id_valid`.
+- Se você usa a integração opcional da Fase 2, ela pode detectar o ID e sugerir
+  o valor; isso não é necessário para o add-on.
 - Corrija `SKILL_ID`, reinicie o add-on e teste novamente.
 - Sem `SKILL_ID`, a skill aceita qualquer skill assinada pela Amazon. Prefira
   preencher o valor.
@@ -450,15 +997,57 @@ Não faça chamadas públicas a `/status`.
   logs.
 - Use `/status` (recent invocations) ou `/invocations` como indicador.
 
+### A Alexa responde "could not retrieve the latest music stream from the API"
+
+- O add-on está sem `streamUrl`.
+- O provider Alexa do Music Assistant não enviou `POST /ma/push-url`.
+- Confira o `API URL` do provider: `http://<IP_DO_HOME_ASSISTANT>:5000`, sem
+  `/ma`, e com a porta `5000` correta.
+- Confira `API Basic Auth Username` e `API Basic Auth Password`.
+- Teste:
+  ```sh
+  curl -i -u "$APP_USERNAME:$APP_PASSWORD" \
+    "http://<IP_DO_HOME_ASSISTANT>:5000/ma/latest-url"
+  ```
+- Se retornar `404 No URL available`, toque algo pelo Music Assistant e teste
+  novamente.
+- Se o add-on reiniciou, o stream em memória foi perdido; toque algo no MA
+  novamente antes de invocar a Alexa.
+- Veja os logs do MA em busca de `/ma/push-url`, `401` ou
+  `Failed API request`.
+
+### A Alexa responde "can't reach the audio file"
+
+- O add-on encontrou um `streamUrl`, mas não conseguiu validar a URL pública.
+- Teste a URL no host:
+  ```sh
+  curl -I 'https://stream.exemplo.com/...'
+  ```
+- Teste de dentro do add-on:
+  ```sh
+  docker exec addon_<slug> \
+    python -c "import requests; r=requests.head('<URL>', allow_redirects=True, timeout=5); print(r.status_code)"
+  ```
+- Se o host funciona e o contêiner falha, é hairpin NAT/DNS interno. Ative
+  `SKIP_URL_VALIDATION: true` nas opções do add-on, reinicie e teste.
+- Se ambos falham, confira:
+  - rota de `MA_HOSTNAME` apontando para a porta `8097` do Music Assistant;
+  - ordem das rotas no Cloudflare;
+  - certificado válido;
+  - acesso à URL fora da rede local.
+
 ### O áudio não toca
 
 - Confirme que `MA_HOSTNAME` está correto e que o túnel aponta para a porta
   `8097` do Music Assistant.
 - Confirme que o certificado de `MA_HOSTNAME` é válido.
 - Confirme que o player do Music Assistant está ativo.
+- Confirme que o provider Alexa do MA está configurado com a URL interna e as
+  credenciais do add-on.
 - Se o add-on não consegue alcançar o hostname público, ative
   `SKIP_URL_VALIDATION` temporariamente.
-- Verifique `/status`.
+- Verifique `/status` e as invocações recentes.
+- Veja também [Provider Alexa do Music Assistant](#provider-alexa-do-music-assistant).
 
 ### Próxima/anterior não funcionam
 
@@ -490,8 +1079,9 @@ Não faça chamadas públicas a `/status`.
 ## Segurança
 
 - Exponha publicamente apenas `POST /` em `SKILL_HOSTNAME`.
-- Mantenha `/setup`, `/status`, `/devices`, `/docs`, `/ma` e `/alexa` somente na
-  rede local.
+- Mantenha `/setup` (e `/setup/*`), `/status` (e `/status/*`), `/devices`,
+  `/docs`, `/openapi.json`, `/ma`, `/alexa`, `/simulator` (e `/simulator/*`) e
+  `/invocations` somente na rede local.
 - O `POST /` valida as assinaturas das requisições da Alexa usando o ASK SDK.
   Não desative essa validação.
 - Use credenciais aleatórias fortes. O add-on gera credenciais quando os
@@ -532,8 +1122,47 @@ Trate o backup como material sensível.
   hostname para a porta correta do Music Assistant.
 - O add-on não cria túneis, não emite certificados e não configura DNS.
 - Não há suporte a Nabu Casa.
-- A integração personalizada e o setup assistido com checklist chegam nas
-  Fases 2 e 3.
+- A integração personalizada e o painel foram instalados e testados em Home
+  Assistant real. O options flow completo e o reauth ainda não têm teste
+  end-to-end dedicado. O add-on também oferece `/setup` e `/status`.
+
+## Validação e distribuição
+
+O estado real das validações, com ambiente, evidência e pendências, está em:
+
+- [`docs/VALIDATION-MATRIX.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/VALIDATION-MATRIX.md) — matriz de
+  compatibilidade;
+- [`docs/HAOS-TEST-PLAN.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/HAOS-TEST-PLAN.md) —
+  roteiro de instalação, backup/restauração e testes reais;
+- [`docs/DISTRIBUTION-READINESS.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/DISTRIBUTION-READINESS.md) —
+  checklist de prontidão;
+- [`docs/releases/RELEASE-DRAFT.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/releases/RELEASE-DRAFT.md) —
+  rascunho da primeira release, **não publicado**;
+- [`docs/images/README.md`](https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/images/README.md) — capturas necessárias.
+
+A validação manual em Home Assistant real aprovou seis cenários: invocação sem
+música ativa, troca de música, pausa/retomada, próxima música, reprodução em
+múltiplos Echos e painel lateral. Esses testes foram executados pelo usuário e
+não fazem parte da CI.
+
+A CI fica em `.github/workflows/ci.yml` e executa, em Linux, validação de
+metadados, testes do add-on, testes da integração, ruff, testes/build do
+frontend, Hassfest e HACS Action. A execução `45716728724`, no commit `8ab7492`,
+aprovou os cinco jobs: 107 testes Linux, 26 subtests e 38 testes de frontend.
+Ela não publica imagens, tags ou Releases.
+
+## Suporte
+
+- Abra issues em <https://github.com/flaviocorrea13/alexa-skill/issues>.
+- Use o template de bug e informe versões do add-on, da integração, do Home
+  Assistant e do Music Assistant, ambiente, arquitetura, túnel/proxy e passos
+  para reproduzir.
+- Antes de anexar logs ou diagnóstico, remova senhas, tokens, credenciais ASK,
+  `SKILL_ID` completo, IPs, hostnames privados e dados pessoais.
+- Não publique `APP_PASSWORD`, `MA_API_TOKEN`, credenciais ASK, backups ou
+  capturas com dados sensíveis.
+- Não há canal oficial por e-mail, Discord ou comunidade; o repositório é o
+  canal do projeto.
 
 ## English quick start
 

@@ -1,0 +1,15 @@
+[tool.ruff]
+# The add-on runs inside the upstream image, whose Python version is not
+# controlled by this repository. Keep the target conservative (3.11) so the
+# formatter never emits syntax that older runtimes cannot parse.
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+# Historical rule set used by the project. Do not expand without a dedicated
+# lint cleanup; this keeps CI changes scoped to distribution work.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

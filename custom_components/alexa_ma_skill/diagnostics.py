@@ -14,7 +14,7 @@ from .coordinator import AlexaMaSkillData
 from .supervisor import SupervisorOperationError, SupervisorUnavailableError
 from .util import (
     html_to_text,
-    mask_skill_id,
+    mask_skill_identifier,
     mask_skill_ids_in_text,
     redact_stream_urls,
 )
@@ -49,7 +49,7 @@ def _mask_skill_id_fields(value: Any) -> Any:
                 and key.lower() == "skill_id"
                 and isinstance(item, str)
             ):
-                masked[key] = mask_skill_id(item)
+                masked[key] = mask_skill_identifier(item)
             else:
                 masked[key] = _mask_skill_id_fields(item)
         return masked
@@ -74,7 +74,7 @@ def _detailed_data(detailed: DetailedStatus | None) -> dict[str, Any] | None:
         "alexa_api_level": detailed.alexa_api_level.value,
         "ma_api_details": detailed.ma_api_details,
         "stream_url": detailed.stream_url,
-        "detected_skill_id": mask_skill_id(detailed.detected_skill_id),
+        "detected_skill_id": mask_skill_identifier(detailed.detected_skill_id),
     }
 
 
@@ -88,13 +88,15 @@ def _coordinator_data(data: AlexaMaSkillData | None) -> dict[str, Any] | None:
         "last_check": data.last_check.isoformat() if data.last_check else None,
         "detailed_error": data.detailed_error,
         "container_online": data.container_online,
+        "addon_installed": data.addon_installed,
+        "addon_hostname": data.addon_hostname,
         "addon_version": data.addon_version,
         "https_skill_ok": data.https_skill_ok,
         "https_stream_ok": data.https_stream_ok,
         "stream_url_present": data.stream_url_present,
-        "configured_skill_id": mask_skill_id(data.configured_skill_id),
-        "detected_skill_id": mask_skill_id(data.detected_skill_id),
-        "suggested_skill_id": mask_skill_id(data.suggested_skill_id),
+        "configured_skill_id": mask_skill_identifier(data.configured_skill_id),
+        "detected_skill_id": mask_skill_identifier(data.detected_skill_id),
+        "suggested_skill_id": mask_skill_identifier(data.suggested_skill_id),
         "skill_id_matches": data.skill_id_matches,
         "detailed": _detailed_data(data.detailed),
     }
@@ -119,7 +121,7 @@ async def async_get_config_entry_diagnostics(
 
     if runtime is not None:
         supervisor = runtime.supervisor
-        if supervisor.available:
+        if supervisor.manager_ready:
             try:
                 info = await supervisor.async_get_info()
             except (

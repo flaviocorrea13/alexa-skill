@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentação do Alexa MA Skill
+    url: https://github.com/flaviocorrea13/alexa-skill/blob/main/alexa_ma_skill/DOCS.md
+    about: Requisitos, instalação, exposição HTTPS, provider Alexa e solução de problemas.
+  - name: Matriz de validação
+    url: https://github.com/flaviocorrea13/alexa-skill/blob/main/docs/VALIDATION-MATRIX.md
+    about: O que já foi testado, em qual ambiente e o que continua pendente.

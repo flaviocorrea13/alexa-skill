@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest a feature or improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Descreva o problema que você quer resolver. Recursos que dependem de
+        automação da conta Amazon, login sem interação ou exposição pública de
+        endpoints administrativos não estão no escopo do projeto.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Li o README e o DOCS.md e o recurso ainda não existe.
+          required: true
+        - label: Procurei uma solicitação existente com o mesmo tema.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema ou necessidade
+      description: O que você está tentando fazer e o que dificulta hoje.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Solução proposta
+      description: Como você imagina o comportamento ideal.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+  - type: dropdown
+    id: component
+    attributes:
+      label: Componente
+      options:
+        - Add-on
+        - Integração personalizada
+        - Documentação
+        - Outro
+    validations:
+      required: true

@@ -18,7 +18,24 @@ _STREAM_JSON_RE = re.compile(
     r'("(?:streamUrl|audioSources)"\s*:\s*")[^"]*(")',
     re.IGNORECASE,
 )
+# Detection only: used to pull a candidate ID out of logs and status text. It
+# intentionally stays permissive so a change in the upstream output never stops
+# the integration from recognising an ID.
 _SKILL_ID_RE = re.compile(r"amzn1\.ask\.skill\.[0-9A-Za-z\-]+")
+# Publication: only the documented ``amzn1.ask.skill.<uuid>`` form keeps a
+# recognizable prefix and suffix. Everything else is fully masked.
+_SKILL_ID_VALID_RE = re.compile(
+    r"amzn1\.ask\.skill\."
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+    re.IGNORECASE,
+)
+# Candidates inside free text, including dotted tails, so a malformed value is
+# masked as a whole instead of leaving a visible remainder.
+_SKILL_ID_CANDIDATE_RE = re.compile(
+    r"amzn1\.ask\.skill\.[0-9A-Za-z_\-]+(?:\.[0-9A-Za-z_\-]+)*",
+    re.IGNORECASE,
+)
+_MASKED_VALUE = "***"
 
 
 def entry_config(entry: ConfigEntry) -> dict[str, Any]:
@@ -94,20 +111,58 @@ def extract_skill_id(value: str) -> str | None:
     return matches[-1] if matches else None
 
 
+def is_valid_skill_id(value: str | None) -> bool:
+    """Return True for a complete Alexa skill ID in the documented format.
+
+    The format is the one the project already reads from ``/setup`` logs and
+    stores as ``SKILL_ID``: ``amzn1.ask.skill.`` followed by a dash-separated
+    UUID. A matching prefix alone is not proof of a valid identifier.
+    """
+    if not value:
+        return False
+    return _SKILL_ID_VALID_RE.fullmatch(str(value).strip()) is not None
+
+
 def mask_skill_id(value: str | None) -> str | None:
-    """Mask a skill ID, keeping only the start and the end."""
+    """Mask a skill ID, keeping only the start and the end.
+
+    Only identifiers in the documented format keep a recognizable prefix and
+    suffix. Any other value is fully masked, so a malformed ID or a mistyped
+    secret can never be published partially.
+    """
     if not value:
         return None
-    if len(value) <= 16:
-        return "***"
-    return f"{value[:16]}...{value[-6:]}"
+    text = str(value).strip()
+    if not text:
+        return None
+    if _SKILL_ID_VALID_RE.fullmatch(text) is None:
+        return _MASKED_VALUE
+    return f"{text[:16]}...{text[-6:]}"
+
+
+def mask_skill_identifier(value: str | None) -> str | None:
+    """Return a masked skill ID for entities and the admin panel."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return mask_skill_id(text)
 
 
 def mask_skill_ids_in_text(value: str) -> str:
-    """Mask every skill ID embedded in a text value."""
+    """Mask every skill ID, or skill-ID-like value, embedded in a text.
+
+    Valid identifiers keep the ``prefix...suffix`` form. Malformed candidates
+    are replaced as a whole with ``***`` so no fragment of a mistyped secret
+    leaks through entity states, attributes or diagnostics.
+    """
     if not value:
         return ""
-    return _SKILL_ID_RE.sub(lambda match: mask_skill_id(match.group(0)) or "***", value)
+    return _SKILL_ID_CANDIDATE_RE.sub(
+        lambda match: mask_skill_id(match.group(0)) or _MASKED_VALUE,
+        value,
+    )
 
 
 def skill_linked(skill_ask_html: str, level: StatusLevel) -> bool:

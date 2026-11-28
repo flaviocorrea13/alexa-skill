@@ -20,6 +20,7 @@ import sys
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import urlparse
 
 DATA_DIR = Path("/data")
 USERNAME_FILE = DATA_DIR / "generated_app_username"
@@ -140,6 +141,22 @@ def _write_secret(path: Path, value: str) -> None:
     _write_atomic(path, value + "\n", 0o600)
 
 
+def _remove_generated_secret(path: Path, label: str) -> None:
+    """Remove a stale generated secret when explicit credentials are used."""
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        print(
+            f"Warning: could not remove the stale generated file for {label} "
+            f"at {path}: {exc}",
+            file=sys.stderr,
+        )
+        return
+    print(f"Removed stale generated file for {label}: {path}.")
+
+
 def _same_path(value: str, path: Path) -> bool:
     try:
         return os.path.normpath(value) == os.path.normpath(str(path))
@@ -181,10 +198,12 @@ def _resolve_secret(
                     ) from exc
                 if value:
                     options[key] = candidate
+                    _remove_generated_secret(generated_path, label)
                     return value
                 # An empty file is treated as "not configured" and regenerated.
             else:
                 options[key] = candidate
+                _remove_generated_secret(generated_path, label)
                 return candidate
 
     value = _read_generated(generated_path)
@@ -306,6 +325,25 @@ def _validate_locale(value: object) -> str:
     return text
 
 
+def _validate_ma_api_url(value: object) -> str:
+    """Validate the optional Music Assistant API URL."""
+    text = _as_text(value).strip()
+    if not text:
+        return ""
+    if any(character in text for character in "\r\n\t "):
+        raise ConfigError("MA_API_URL must not contain spaces or line breaks.")
+    parsed = urlparse(text)
+    if parsed.scheme not in {"http", "https", "ws", "wss"}:
+        raise ConfigError("MA_API_URL must use http://, https://, ws:// or wss://.")
+    if not parsed.netloc:
+        raise ConfigError("MA_API_URL must include a host and port.")
+    if parsed.username or parsed.password:
+        raise ConfigError(
+            "MA_API_URL must not contain credentials; use MA_API_TOKEN instead."
+        )
+    return text
+
+
 def _prepare(options: dict[str, object]) -> dict[str, str]:
     skill_hostname = _clean_hostname(
         "SKILL_HOSTNAME", options.get("SKILL_HOSTNAME"), required=True
@@ -322,9 +360,7 @@ def _prepare(options: dict[str, object]) -> dict[str, str]:
     enable_apl = _normalise_bool(options.get("ENABLE_APL"))
     skip_url_validation = _normalise_bool(options.get("SKIP_URL_VALIDATION"))
     skill_id = _as_text(options.get("SKILL_ID")).strip()
-    ma_api_url = _as_text(options.get("MA_API_URL")).strip()
-    if ma_api_url and any(character in ma_api_url for character in "\r\n\t "):
-        raise ConfigError("MA_API_URL must not contain spaces or line breaks.")
+    ma_api_url = _validate_ma_api_url(options.get("MA_API_URL"))
 
     _resolve_secret(
         options,

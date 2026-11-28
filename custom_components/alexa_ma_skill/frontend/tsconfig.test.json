@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ES2022",
+    "outDir": ".test-build",
+    "noEmit": false
+  },
+  "include": [
+    "src/panel-model.ts",
+    "src/api.ts",
+    "src/recovery.ts",
+    "src/localize.ts",
+    "src/alexa-ma-panel.ts",
+    "src/types.ts"
+  ]
+}

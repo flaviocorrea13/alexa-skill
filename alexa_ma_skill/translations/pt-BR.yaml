@@ -63,7 +63,7 @@ configuration:
     name: URL da API do Music Assistant (avançado)
     description: >-
       URL base da API WebSocket do Music Assistant, na porta 8095. Exemplo:
-      http://192.168.1.10:8095. É diferente da porta de stream 8097. Necessária
+      http://192.0.2.10:8095. É diferente da porta de stream 8097. Necessária
       para comandos de voz como próxima, anterior e início da faixa.
   MA_API_TOKEN:
     name: Token da API do Music Assistant (avançado)

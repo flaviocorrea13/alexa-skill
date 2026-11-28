@@ -1,0 +1,127 @@
+name: Bug report
+description: Report a problem with the add-on or the custom integration
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por testar o Alexa MA Skill. Nunca cole senhas, tokens,
+        credenciais da Amazon, arquivos de backup ou logs sem revisão.
+        Antes de enviar, remova hostnames privados, IPs e IDs pessoais.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Li o README e a seção de solução de problemas do DOCS.md.
+          required: true
+        - label: Procurei uma issue existente com o mesmo problema.
+          required: true
+        - label: Removi senhas, tokens, credenciais e dados pessoais do texto e dos logs.
+          required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Componente
+      options:
+        - Add-on
+        - Integração personalizada
+        - Add-on e integração
+        - Documentação
+    validations:
+      required: true
+  - type: input
+    id: addon_version
+    attributes:
+      label: Versão do add-on
+      description: Aparece na página do add-on no Home Assistant.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: integration_version
+    attributes:
+      label: Versão da integração
+      description: Manifesto da integração ou lista de integrações. Deixe vazio se não usar.
+      placeholder: "0.2.0"
+  - type: input
+    id: ha_version
+    attributes:
+      label: Versão do Home Assistant
+      placeholder: "2026.10.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Ambiente
+      options:
+        - Home Assistant OS
+        - Home Assistant Supervised
+        - Home Assistant Container/Core (sem add-ons)
+        - Outro
+    validations:
+      required: true
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Arquitetura
+      options:
+        - amd64
+        - aarch64
+        - armv7
+        - armhf
+        - i386
+        - Não sei
+    validations:
+      required: true
+  - type: input
+    id: ma_version
+    attributes:
+      label: Versão do Music Assistant
+      placeholder: "ex.: 2.5.0"
+  - type: input
+    id: proxy
+    attributes:
+      label: Túnel ou proxy reverso
+      description: "Ex.: Cloudflare Tunnel, Nginx Proxy Manager, Traefik."
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição do problema
+      description: O que aconteceu e o que você esperava que acontecesse.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs relevantes (revisados)
+      description: >-
+        Logs do add-on, da integração ou do Music Assistant. Remova senhas,
+        tokens, credenciais ASK, URLs privadas e IDs pessoais.
+      render: text
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnóstico da integração (opcional)
+      description: >-
+        Configurações > Dispositivos e serviços > Alexa MA Skill > menu de três
+        pontos > Baixar diagnóstico. Revise o arquivo antes de anexar.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Informações adicionais
+      description: Configuração de rede relevante, mudanças recentes, etc.
